@@ -188,3 +188,25 @@ describe("the job runner", () => {
     expect(await prisma().job.count({ where: { status: "FAILED", error: "Dossier restarted before this finished. Try again." } })).toBe(2);
   });
 });
+
+it("records and uses one source profile snapshot for an AI attempt", async () => {
+  await prisma().profileField.create({ data: { key: "name", value: "Original candidate" } });
+  const sourceJob = defineJob({
+    type: "test-captured-source",
+    captureSource: true,
+    input: z.object({}),
+    result: z.object({ name: z.string() }),
+    async run(_input, { step }) {
+      await step("Source captured");
+      await new Promise<void>((resolve) => gates.set("captured-source", resolve));
+      const { loadProfile } = await import("@/lib/profile-data");
+      return { name: (await loadProfile()).basics.name };
+    },
+  });
+  const id = await startJob(sourceJob, {});
+  await eventually(async () => expect(await getJob(id)).toMatchObject({ status: "RUNNING", step: "Source captured" }));
+  await prisma().profileField.update({ where: { key: "name" }, data: { value: "Changed during generation" } });
+  await release("captured-source");
+  await eventually(async () => expect(await getJob(id)).toMatchObject({ status: "DONE", result: { name: "Original candidate" } }));
+  expect((await prisma().job.findUniqueOrThrow({ where: { id } })).provenance).toEqual([expect.objectContaining({ provider: "LOCAL", sourceProfile: expect.objectContaining({ basics: expect.objectContaining({ name: "Original candidate" }) }) })]);
+});

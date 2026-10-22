@@ -235,7 +235,7 @@ export function NewApplication({ aiReady, writeInClaude = false, samplePosting, 
       return;
     }
     setStarting(true);
-    const result = toastResult(await startReadingPosting({ posting: draft.posting }));
+    const result = toastResult(await startReadingPosting({ posting: draft.posting, ...(draft.postingUrl.trim() ? { postingUrl: draft.postingUrl.trim() } : {}), ...(draft.postingId ? { postingId: draft.postingId } : {}) }));
     setStarting(false);
     if (result.ok) update({ step: "reading", readJobId: result.data, readFor: draft.posting.trim(), read: null });
   };

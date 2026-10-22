@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "name": "Frontmatter",
+  "representation": "frontmatter",
+  "selection": {
+    "include": [
+      "**/*.md"
+    ],
+    "exclude": [
+      "Dossier/**"
+    ]
+  },
+  "fields": {
+    "company": "company_name",
+    "role": "job_role",
+    "status": "status",
+    "applicationDate": "application_date",
+    "postingUrl": "job_url",
+    "location": "location",
+    "deadline": "deadline",
+    "nextAction": "next_action",
+    "followUpDate": "follow_up_date",
+    "nextInterviewAt": "next_interview_at"
+  },
+  "idProperty": "dossier_id",
+  "metadataHeading": "Application",
+  "statusAliases": {
+    "draft": "DRAFT",
+    "Draft": "DRAFT",
+    "sent": "SENT",
+    "Sent": "SENT",
+    "screening": "SCREENING",
+    "Screening": "SCREENING",
+    "interview": "INTERVIEW",
+    "Interview": "INTERVIEW",
+    "offer": "OFFER",
+    "Offer": "OFFER",
+    "accepted": "ACCEPTED",
+    "Accepted": "ACCEPTED",
+    "rejected": "REJECTED",
+    "Rejected": "REJECTED",
+    "declined": "DECLINED",
+    "Declined": "DECLINED"
+  },
+  "dateFormat": "YYYY-MM-DD",
+  "template": "---\ncompany_name: {{company}}\njob_role: {{role}}\nstatus: {{status}}\n---\n\n# Interview\n\n"
+}

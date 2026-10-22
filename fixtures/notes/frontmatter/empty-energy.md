@@ -20,4 +20,4 @@ My notes, tasks and impressions.
 - [ ] Ask about remote work
 - [x] Read [[Energy research]]
 
-![[attachments/diagram.png]]
+![[attachments/diagram.svg]]

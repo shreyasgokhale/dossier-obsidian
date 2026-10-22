@@ -15,8 +15,8 @@ import { prisma } from "@/lib/prisma";
 
 /** "Read the posting →": starts reading it in the background and returns the job's id (E7-2). */
 export const startReadingPosting = action(
-  z.object({ posting: z.string().trim().min(1, "Paste a job posting first.").max(100_000) }),
-  ({ posting }) => startJob(readPostingJob, { posting }),
+  z.object({ posting: z.string().trim().min(1, "Paste a job posting first.").max(100_000), postingUrl: z.string().max(2000).optional(), postingId: z.string().min(1).max(100).optional() }),
+  ({ posting, postingUrl, postingId }) => startJob(readPostingJob, { posting, ...(postingUrl ? { postingUrl: postingLink(postingUrl) } : {}), ...(postingId ? { postingId } : {}) }),
 );
 
 /**

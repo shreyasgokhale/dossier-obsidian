@@ -1,6 +1,10 @@
 import "server-only";
 
-import type { Prisma, PrismaClient, StatusEvent } from "@/generated/prisma/client";
+import type {
+  Prisma,
+  PrismaClient,
+  StatusEvent,
+} from "@/generated/prisma/client";
 import type { ApplicationStatus } from "@/generated/prisma/enums";
 
 import { advance, undoChange } from "./status";
@@ -26,21 +30,31 @@ export async function applyStatusChange(
 }
 
 /** Shared transactional domain function for deterministic Markdown imports. */
-export async function applyStatusChangeTx(tx: Prisma.TransactionClient, applicationId: string, to: ApplicationStatus, now = new Date()): Promise<StatusChangeResult> {
-    // Lock the row so two changes to the same application can't interleave.
-    await tx.$queryRaw`SELECT 1 FROM "Application" WHERE id = ${applicationId} FOR UPDATE`;
-    const application = await tx.application.findUnique({
-      where: { id: applicationId },
-      select: { status: true, furthestStage: true, sentAt: true },
-    });
-    if (!application) return { outcome: "not-found" };
+export async function applyStatusChangeTx(
+  tx: Prisma.TransactionClient,
+  applicationId: string,
+  to: ApplicationStatus,
+  now = new Date(),
+): Promise<StatusChangeResult> {
+  // Lock the row so two changes to the same application can't interleave.
+  await tx.$queryRaw`SELECT 1 FROM "Application" WHERE id = ${applicationId} FOR UPDATE`;
+  const application = await tx.application.findUnique({
+    where: { id: applicationId },
+    select: { status: true, furthestStage: true, sentAt: true },
+  });
+  if (!application) return { outcome: "not-found" };
 
-    const change = advance(application, to, now);
-    if (!change) return { outcome: "unchanged" };
+  const change = advance(application, to, now);
+  if (!change) return { outcome: "unchanged" };
 
-    await tx.application.update({ where: { id: applicationId }, data: change.update });
-    const event = await tx.statusEvent.create({ data: { applicationId, ...change.event } });
-    return { outcome: "changed", event };
+  await tx.application.update({
+    where: { id: applicationId },
+    data: change.update,
+  });
+  const event = await tx.statusEvent.create({
+    data: { applicationId, ...change.event },
+  });
+  return { outcome: "changed", event };
 }
 
 export type UndoResult =
@@ -53,7 +67,10 @@ export type UndoResult =
  * from before it and deletes its event. Only the application's latest change
  * can be undone; after a newer one, the result is "superseded".
  */
-export async function undoStatusChange(db: PrismaClient, eventId: string): Promise<UndoResult> {
+export async function undoStatusChange(
+  db: PrismaClient,
+  eventId: string,
+): Promise<UndoResult> {
   return db.$transaction(async (tx) => {
     const event = await tx.statusEvent.findUnique({ where: { id: eventId } });
     if (!event) return { outcome: "not-found" };
@@ -67,7 +84,10 @@ export async function undoStatusChange(db: PrismaClient, eventId: string): Promi
     if (latest?.id !== event.id) return { outcome: "superseded" };
 
     const restored = undoChange(event);
-    await tx.application.update({ where: { id: event.applicationId }, data: restored });
+    await tx.application.update({
+      where: { id: event.applicationId },
+      data: restored,
+    });
     await tx.statusEvent.delete({ where: { id: event.id } });
     return { outcome: "undone", status: restored.status };
   });

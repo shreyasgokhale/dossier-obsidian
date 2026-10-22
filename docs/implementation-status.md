@@ -18,6 +18,9 @@ PostgreSQL remains authoritative for operations. Integration is a focused option
 Use persisted normalized snapshots for three-way comparisons, content hashes for stale
 preview checks, and a transactional outbox for filesystem retries. All paths are
 relative to runtime roots; sources and synthetic fixtures remain separate.
+Application date is an explicit date field, kept separate from upstream sentAt: an empty
+or historical note date must not silently replace the native status-transition timestamp.
+
 No private infrastructure is available; actual Proxmox/HTTPS/private vault deployment
 will be documented as unverified.
 
@@ -69,3 +72,31 @@ Next: finish the ongoing checks, resolve any coverage gaps without changing thre
 rerun browser workflow including disconnect/recovery/PDF on the final image, run all upstream
 Playwright tests, complete CI/runbook/PR summary and final commits. Local-model inference
 remains externally blocked by the model registry's 403. No production deployment or merge.
+
+### Resource recovery checkpoint
+
+Docker's vfs build snapshots filled the 32 GB workspace filesystem during concurrent
+validation; ENOSPC prevented an end-to-end filesystem update and trace writing.
+The affected coverage/browser runs are invalid as final evidence. No checks were
+weakened. Canceled the unfinished app image build, removed disposable caches and
+stopped the disposable CouchDB after its six passing tests. Final validation must
+run sequentially on this 2-CPU/8-GB environment. The exact upstream baseline run
+was canceled during resource recovery and must be rerun in work/upstream with its
+separate dossier_upstream_test database. Native app build and focused tests have
+passed; full coverage and end-to-end completion remain outstanding.
+
+### Exact upstream baseline
+
+Verified unmodified commit 4fd5329 in work/upstream against its own database:
+1,490 tests passed, 26 optional live tests skipped, one pre-existing timeout in
+src/lib/google/google.db.test.ts:125 (inbox classification, 5,000 ms limit).
+No integration changes are present in that checkout. Focused retry is recorded
+separately in work/upstream-google-retry.log. Final fork checks are now sequential
+with one test worker and unchanged timeouts/coverage thresholds.
+
+The exact upstream inbox timeout passed all four tests on an unchanged focused retry
+(4.57 seconds total), confirming a timing-sensitive baseline test. Native lint/typecheck
+pass. The current full run found two new regressions under targeted validation: section
+rebinding proposed unnecessary empty metadata, now removed, and a Find jobs assertion
+needed to include the URL/source ID now preserved for cross-tab recovery. These are being
+rechecked without reducing assertions or changing test timeouts.

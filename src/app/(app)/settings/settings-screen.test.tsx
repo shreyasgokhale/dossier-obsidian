@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { SettingsScreen } from "./settings-screen";
 
 describe("SettingsScreen", () => {
-  it("has the header and the six sections, the current one marked (E10-1)", () => {
+  it("has the header and the settings sections, the current one marked (E10-1)", () => {
     render(
       <SettingsScreen section="data">
         <p>Section body</p>
