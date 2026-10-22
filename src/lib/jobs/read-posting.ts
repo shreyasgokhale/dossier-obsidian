@@ -16,6 +16,7 @@ import { defineJob } from "./runner";
  * Saves nothing: the result waits in the job until the application is created.
  */
 export const readPostingJob = defineJob({
+  captureSource: true,
   type: "read-posting",
   input: z.object({ posting: z.string().trim().min(1).max(100_000) }),
   result: z.object({

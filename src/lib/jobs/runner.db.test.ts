@@ -168,6 +168,14 @@ describe("the job runner", () => {
     });
   });
 
+  it("completes a committed checkpoint after restart without rerunning its mutation", async () => {
+    const row = await prisma().job.create({ data: { type: "test-gated", status: "RUNNING", input: { name: "checkpoint-restart", fail: "no" }, result: { greeting: "Already committed" } } });
+    await recoverInterruptedJobs();
+    expect(await retryJob(row.id)).toBe(true);
+    await eventually(async () => expect(await getJob(row.id)).toMatchObject({ status: "DONE", result: { greeting: "Already committed" } }));
+    expect(gates.has("checkpoint-restart")).toBe(false);
+  });
+
   it("marks jobs a previous process left unfinished as failed, so they can be retried", async () => {
     await prisma().job.createMany({
       data: [

@@ -12,6 +12,7 @@ import { formatSlot } from "@/lib/google/slots";
 import { prisma } from "@/lib/prisma";
 import { loadFactTexts, loadProfile } from "@/lib/profile-data";
 
+import { checkpointJob } from "./source-context";
 import { defineJob } from "./runner";
 
 /** The key of a reply being drafted, to find it again after a reload. */
@@ -23,6 +24,7 @@ export const replyJobKey = (emailId: string) => `reply:${emailId}`;
  * they ask to meet. `slots` picks the times; empty asks the calendar.
  */
 export const draftReplyJob = defineJob({
+  captureSource: true,
   type: "draft-reply",
   input: z.object({
     emailId: z.string().min(1),
@@ -74,8 +76,12 @@ export const draftReplyJob = defineJob({
       },
       { ...options, language: null, signal },
     );
-    await prisma.emailMessage.update({ where: { id: emailId }, data: { replyDraft: data.body, replyGaps: data.gaps, draftedWith: promptVersion } });
-    return { ...data, slots: starts };
+    const result = { ...data, slots: starts };
+    await prisma.$transaction(async (tx) => {
+      await tx.emailMessage.update({ where: { id: emailId }, data: { replyDraft: data.body, replyGaps: data.gaps, draftedWith: promptVersion } });
+      await checkpointJob(tx, result);
+    });
+    return result;
   },
 });
 

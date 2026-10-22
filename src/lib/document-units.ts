@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { DocumentKind } from "@/generated/prisma/enums";
 import { unitsSchema, type Unit } from "@/lib/application-data";
 import { saveVersion, type VersionNote } from "@/lib/document-versions";
+import { checkpointJob } from "@/lib/jobs/source-context";
 import { prisma } from "@/lib/prisma";
 
 // Changes to a tailored document's units: an edit by hand (E8-3), a
@@ -29,11 +30,21 @@ const ATTEMPTS = 3;
 export async function updateDocuments<T>(
   applicationId: string,
   change: (documents: DocumentUnits, tx: Prisma.TransactionClient) => Promise<T>,
-  { version }: { version?: VersionNote } = {},
+  { version, writtenWith }: { version?: VersionNote; writtenWith?: string } = {},
 ): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await prisma.$transaction(async (tx) => {
+        return updateDocumentsTx(tx, applicationId, change, { version, writtenWith });
+      });
+    } catch (error) {
+      if (!(error instanceof ChangedMeanwhile) || attempt === ATTEMPTS) throw error;
+    }
+  }
+}
+
+/** Shared domain writer for imports already holding a transaction. */
+export async function updateDocumentsTx<T>(tx: Prisma.TransactionClient, applicationId: string, change: (documents: DocumentUnits, tx: Prisma.TransactionClient) => Promise<T>, { version, writtenWith }: { version?: VersionNote; writtenWith?: string } = {}): Promise<T> {
         const rows = await tx.document.findMany({ where: { applicationId } });
         const documents: DocumentUnits = {};
         for (const row of rows) documents[row.kind] = unitsSchema.parse(row.units);
@@ -47,15 +58,11 @@ export async function updateDocuments<T>(
           // Only if nobody else saved it since it was read.
           const { count } = await tx.document.updateMany({
             where: { id: row.id, updatedAt: row.updatedAt },
-            data: { units },
+            data: { units, ...(writtenWith ? { writtenWith } : {}) },
           });
           if (count === 0) throw new ChangedMeanwhile();
           if (version) await saveVersion(tx, row.id, units, version);
         }
+        await checkpointJob(tx, result);
         return result;
-      });
-    } catch (error) {
-      if (!(error instanceof ChangedMeanwhile) || attempt === ATTEMPTS) throw error;
-    }
-  }
 }

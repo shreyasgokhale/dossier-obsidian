@@ -18,6 +18,7 @@ import { defineJob } from "./runner";
  * so leaving midway leaves nothing behind.
  */
 export const writeDocumentsJob = defineJob({
+  captureSource: true,
   type: "write-documents",
   input: z.object({
     /** The job that read the posting; its result and input are the source of truth. */

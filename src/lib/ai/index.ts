@@ -1,5 +1,6 @@
 import "server-only";
 
+import { jobSourceContext } from "@/lib/jobs/source-context";
 import { AiProvider } from "@/generated/prisma/enums";
 
 import { loadAiConfig, type AiConfig } from "./config";
@@ -35,5 +36,5 @@ export function createProvider(config: AiConfig): AIProvider {
 
 /** The provider configured in Settings, or by the DOSSIER_AI_* variables. */
 export async function getAiProvider(): Promise<AIProvider> {
-  return createProvider(await loadAiConfig());
+  return createProvider(jobSourceContext.getStore()?.config ?? await loadAiConfig());
 }

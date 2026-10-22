@@ -392,6 +392,10 @@ enum FunnelStage {
 model Application {
   id                  String            @id @default(cuid())
   /// Whether the user made it, or the job agent prepared it (E16).
+  markdown            MarkdownLink?
+  applicationDate     DateTime?         @db.Date
+  followUpDate        DateTime?         @db.Date
+  nextAction          String            @default("")
   origin              ApplicationOrigin @default(MANUAL)
   /// The agent's score for the posting, when the agent prepared it.
   agentScore          Int?
@@ -488,6 +492,7 @@ model Document {
   id            String            @id @default(cuid())
   applicationId String
   application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  markdown      MarkdownDocument?
   kind          DocumentKind
   units         Json
   /// The theme it was created with; null falls back to the base theme.
@@ -921,6 +926,8 @@ model Job {
   /// The named step in progress, e.g. "Reading the posting".
   step          String?
   input         Json
+  /// Provider/model and source profile used for each explicit attempt; no API keys.
+  provenance    Json?
   result        Json?
   /// Why it failed, written for the user.
   error         String?
@@ -932,4 +939,55 @@ model Job {
   @@index([key, createdAt])
   @@index([status])
   @@index([applicationId])
+}
+
+// Optional Markdown integration. Runtime roots are deployment configuration.
+model MarkdownProfile {
+  id        String   @id @default(cuid())
+  config    Json
+  draft     Json?
+  paused    Boolean  @default(false)
+  updatedAt DateTime @updatedAt
+  links     MarkdownLink[]
+}
+model MarkdownLink {
+  applicationId String @id
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  profileId String
+  profile MarkdownProfile @relation(fields: [profileId], references: [id])
+  path String @unique
+  noteId String @unique
+  snapshot Json
+  contentHash String
+  state String @default("linked")
+  error String?
+  conflict Json?
+  updatedAt DateTime @updatedAt
+}
+model MarkdownWork {
+  applicationId String @id
+  revision Int @default(1)
+  attempts Int @default(0)
+  error String?
+  updatedAt DateTime @updatedAt
+}
+model MarkdownDocument {
+  documentId String @id
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  path String @unique
+  snapshot Json
+  contentHash String
+  conflict Json?
+  error String?
+  updatedAt DateTime @updatedAt
+}
+model ResumeSource {
+  id String @id
+  path String
+  language String
+  collection String
+  contentHash String
+  content Json
+  targetId String?
+  updatedAt DateTime @updatedAt
 }

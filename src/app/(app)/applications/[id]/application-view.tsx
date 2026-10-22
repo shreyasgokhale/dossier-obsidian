@@ -97,6 +97,7 @@ const NO_AI = "That needs an AI provider. Choose one in Settings → AI provider
 const NOTHING_SAVING: Readonly<Record<string, string>> = {};
 
 export type ApplicationViewProps = {
+  tracking?: ReactNode;
   application: {
     id: string;
     title: string;
@@ -167,6 +168,7 @@ export type ApplicationViewProps = {
  * below the document on narrow windows. The tab is kept in the URL.
  */
 export function ApplicationView({
+  tracking,
   application,
   timeZone,
   meta,
@@ -655,6 +657,7 @@ export function ApplicationView({
           <TabsTrigger value="notes">{notes > 0 ? `Notes · ${notes}` : "Notes"}</TabsTrigger>
         </TabsList>
       </ApplicationHeader>
+      {tracking}
 
       <div className="@container flex min-h-0 flex-1 flex-wrap @min-[780px]/page:flex-nowrap">
         <TabsContent value="resume" className="flex min-h-0 min-w-0 flex-[999_1_480px]">

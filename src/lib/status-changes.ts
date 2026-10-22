@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { PrismaClient, StatusEvent } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient, StatusEvent } from "@/generated/prisma/client";
 import type { ApplicationStatus } from "@/generated/prisma/enums";
 
 import { advance, undoChange } from "./status";
@@ -21,6 +21,12 @@ export async function applyStatusChange(
   now = new Date(),
 ): Promise<StatusChangeResult> {
   return db.$transaction(async (tx) => {
+    return applyStatusChangeTx(tx, applicationId, to, now);
+  });
+}
+
+/** Shared transactional domain function for deterministic Markdown imports. */
+export async function applyStatusChangeTx(tx: Prisma.TransactionClient, applicationId: string, to: ApplicationStatus, now = new Date()): Promise<StatusChangeResult> {
     // Lock the row so two changes to the same application can't interleave.
     await tx.$queryRaw`SELECT 1 FROM "Application" WHERE id = ${applicationId} FOR UPDATE`;
     const application = await tx.application.findUnique({
@@ -35,7 +41,6 @@ export async function applyStatusChange(
     await tx.application.update({ where: { id: applicationId }, data: change.update });
     const event = await tx.statusEvent.create({ data: { applicationId, ...change.event } });
     return { outcome: "changed", event };
-  });
 }
 
 export type UndoResult =
