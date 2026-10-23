@@ -46,6 +46,9 @@ export default defineConfig({
             command: process.env.DOSSIER_TEST_IMAGE
               ? "yarn tsx scripts/run-image-e2e.mts"
               : server.command,
+            ...(process.env.DOSSIER_TEST_IMAGE
+              ? { gracefulShutdown: { signal: "SIGTERM" as const, timeout: 15_000 } }
+              : {}),
             env: { ...server.env, ...integrationEnv },
           }
         : server,
