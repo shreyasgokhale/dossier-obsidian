@@ -18,6 +18,24 @@ vi.spyOn(console, "error").mockImplementation(() => {});
 
 const prisma = () => db.client!;
 
+it("preserves each draft attempt after job retention, including late application links", async () => {
+  const application = await prisma().application.create({ data: {} });
+  const first = { provider: "LOCAL", model: "synthetic-model", sourceProfile: { basics: { name: "Original candidate" } } };
+  const job = await prisma().job.create({ data: { type: "write-documents", status: "DONE", input: {}, provenance: [first] } });
+  await prisma().job.update({ where: { id: job.id }, data: { applicationId: application.id } });
+  await prisma().job.update({ where: { id: job.id }, data: { provenance: [first] } });
+  let saved = (await prisma().application.findUniqueOrThrow({ where: { id: application.id } })).aiProvenance;
+  expect(saved).toEqual([{ ...first, jobId: job.id, type: "write-documents", attempt: 1 }]);
+  const second = { ...first, model: "retried-model" };
+  await prisma().job.update({ where: { id: job.id }, data: { provenance: [first, second] } });
+  await prisma().job.delete({ where: { id: job.id } });
+  saved = (await prisma().application.findUniqueOrThrow({ where: { id: application.id } })).aiProvenance;
+  expect(saved).toEqual([
+    { ...first, jobId: job.id, type: "write-documents", attempt: 1 },
+    { ...second, jobId: job.id, type: "write-documents", attempt: 2 },
+  ]);
+});
+
 /** Waits until `check` passes, for work that runs in the background. */
 async function eventually(check: () => Promise<void>, timeout = 3000) {
   const started = Date.now();

@@ -452,6 +452,7 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
       data: {
         followUpDate: new Date("2026-11-15"),
         nextAction: "Preserve backup",
+        aiProvenance: [{ provider: "LOCAL", model: "synthetic-model", sourceProfile: { basics: { name: "Alex Example" } } }],
       },
     });
     await reconcile();
@@ -464,6 +465,7 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
     await resetDatabase(db());
     await importExport(db(), parsed.data);
     expect((await app(id)).nextAction).toBe("Preserve backup");
+    expect((await app(id)).aiProvenance).toEqual([{ provider: "LOCAL", model: "synthetic-model", sourceProfile: { basics: { name: "Alex Example" } } }]);
     expect((await link(id)).path).toBe(fmFile);
     await reconcile();
     expect(await text()).toBe(original);

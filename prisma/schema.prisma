@@ -396,6 +396,8 @@ model Application {
   applicationDate     DateTime?         @db.Date
   followUpDate        DateTime?         @db.Date
   nextAction          String            @default("")
+  /// Model/source snapshots survive background-job retention and JSON backups.
+  aiProvenance        Json?
   origin              ApplicationOrigin @default(MANUAL)
   /// The agent's score for the posting, when the agent prepared it.
   agentScore          Int?

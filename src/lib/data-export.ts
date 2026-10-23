@@ -198,6 +198,7 @@ const application = z.object({
   applicationDate: optionalDate.optional(),
   followUpDate: optionalDate.optional(),
   nextAction: text.optional(),
+  aiProvenance: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
   postingUrl: text,
   postingText: text,
   extracted: z.unknown().nullable(),
