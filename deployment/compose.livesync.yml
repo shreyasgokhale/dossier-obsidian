@@ -1,0 +1,18 @@
+# Optional overlay: direct filesystem integration does not depend on this service.
+services:
+  livesync:
+    profiles: [livesync]
+    build:
+      context: ..
+      dockerfile: deployment/livesync/Dockerfile
+    image: dossier-livesync:fc0e028d33b3
+    restart: unless-stopped
+    group_add:
+      - "${NOTES_GID:-1000}"
+    volumes:
+      - ${NOTES_ROOT:?Set an external notes directory}:/app/data
+      - ${LIVESYNC_CONFIG:?Set an external private config file}:/app/dat/config.json:ro
+      - livesync-state:/deno-dir
+    # Credentials and localStorage stay outside /app/data.
+volumes:
+  livesync-state:

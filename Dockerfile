@@ -2,10 +2,13 @@
 
 # Debian rather than Alpine: PDFs are printed by Playwright's own Chromium,
 # which isn't built for musl (decided in E5-5, #46).
-FROM node:24-trixie-slim AS base
+FROM node:24.19.0-trixie-slim@sha256:ab3eebe934147fee049b5eb83c570f68c849a13c930bdfa482de99fcdfa3b3de AS base
 WORKDIR /app
 # Swap the image's bundled Yarn 1 for the version pinned in package.json (packageManager).
-RUN corepack enable
+RUN corepack disable
+RUN --mount=type=secret,id=proxy_ca \
+  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+  npm install --global --force @yarnpkg/cli-dist@4.18.1
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 # Where Playwright keeps Chromium: in the image, not in a user's home or a volume.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -15,12 +18,18 @@ FROM base AS dev
 RUN chown node:node /app
 USER node
 COPY --chown=node:node package.json yarn.lock .yarnrc.yml ./
-RUN yarn install --immutable && mkdir .next
+RUN --mount=type=secret,id=proxy_ca \
+  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+  if [ -n "$HTTPS_PROXY" ]; then export YARN_HTTPS_PROXY="$HTTPS_PROXY"; fi; \
+  if [ -n "$HTTP_PROXY" ]; then export YARN_HTTP_PROXY="$HTTP_PROXY"; fi; \
+  yarn install --immutable && mkdir .next
 # Chromium for PDFs, matching the installed playwright-core, with the system
 # libraries and fonts it needs (installing those takes root). Only the
 # headless shell: printing needs nothing more.
 USER root
-RUN node node_modules/playwright-core/cli.js install --with-deps --only-shell chromium \
+RUN --mount=type=secret,id=proxy_ca \
+  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+  node node_modules/playwright-core/cli.js install --with-deps --only-shell chromium \
   && rm -rf /var/lib/apt/lists/*
 USER node
 EXPOSE 3000
@@ -34,32 +43,30 @@ CMD ["sh", "-c", "yarn prisma generate && yarn prisma migrate deploy && yarn pri
 
 FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
-RUN yarn install --immutable
+RUN --mount=type=secret,id=proxy_ca \
+  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+  if [ -n "$HTTPS_PROXY" ]; then export YARN_HTTPS_PROXY="$HTTPS_PROXY"; fi; \
+  if [ -n "$HTTP_PROXY" ]; then export YARN_HTTP_PROXY="$HTTP_PROXY"; fi; \
+  yarn install --immutable
 
 FROM deps AS build
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY . .
-RUN yarn prisma generate && yarn build
-# Prisma's CLI for `migrate deploy`, at the version in yarn.lock, with the
-# same resolutions as package.json; not the rest of the dev dependencies.
-RUN mkdir /tools && node -e ' \
-  const version = (name) => require(`/app/node_modules/${name}/package.json`).version; \
-  const resolutions = require("/app/package.json").resolutions ?? {}; \
-  require("node:fs").writeFileSync("/tools/package.json", JSON.stringify({ \
-    private: true, \
-    dependencies: { prisma: version("prisma"), dotenv: version("dotenv") }, \
-    overrides: Object.fromEntries(Object.entries(resolutions).map(([from, to]) => [from.split("@npm:")[0], to])), \
-  }));' \
-  && cd /tools && npm install --omit=dev --no-audit --no-fund \
-  && cp -r /app/prisma7.config.ts /app/prisma /tools/
-# The seed as one JavaScript file, so it runs without tsx (E12-3). Bundled
-# CommonJS packages (pg) need a real require.
-RUN node_modules/.bin/esbuild prisma/seed.ts --bundle --platform=node --format=esm --target=node24 \
-  --external:pg-native --outfile=/tools/seed.mjs \
-  --banner:js='import { createRequire } from "node:module"; const require = createRequire(import.meta.url);'
-# `hash-password`, which makes the hash for DOSSIER_PASSWORD, as one file too.
-RUN node_modules/.bin/esbuild scripts/hash-password.ts --bundle --platform=node --format=esm --target=node24 \
-  --outfile=/tools/hash-password.mjs --banner:js='#!/usr/bin/env node' \
+# Build the app and isolated migration tools in one layer. This also bounds
+# temporary space on Docker hosts using the vfs storage driver.
+# The tools lockfile pins the CLI and the same dependency override as yarn.lock.
+RUN --mount=type=secret,id=proxy_ca \
+  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+  yarn prisma generate && yarn build \
+  && mkdir /tools && cp deployment/tools/package.json deployment/tools/package-lock.json /tools/ \
+  && cd /tools && npm ci --omit=dev --no-audit --no-fund \
+  && cp -r /app/prisma7.config.ts /app/prisma /tools/ \
+  && cd /app \
+  && node_modules/.bin/esbuild prisma/seed.ts --bundle --platform=node --format=esm --target=node24 \
+    --external:pg-native --outfile=/tools/seed.mjs \
+    --banner:js='import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' \
+  && node_modules/.bin/esbuild scripts/hash-password.ts --bundle --platform=node --format=esm --target=node24 \
+    --outfile=/tools/hash-password.mjs --banner:js='#!/usr/bin/env node' \
   && chmod 755 /tools/hash-password.mjs
 
 FROM base AS production
@@ -71,6 +78,8 @@ ENV NODE_ENV=production \
 # Chromium for PDFs with its system libraries and fonts, matching the app's
 # playwright-core, as in the dev image. Its CLI is only mounted for this.
 RUN --mount=type=bind,from=deps,source=/app/node_modules/playwright-core,target=/tmp/playwright-core \
+  --mount=type=secret,id=proxy_ca \
+  if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
   node /tmp/playwright-core/cli.js install --with-deps --only-shell chromium \
   && rm -rf /var/lib/apt/lists/*
 COPY --from=build /tools ./tools

@@ -59,7 +59,7 @@ jobs:
       # For the database tests (*.db.test.ts), which create and migrate their own
       # "dossier_test" database on this server.
       postgres:
-        image: postgres:18-alpine
+        image: postgres:18.6-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -81,7 +81,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 24.19.0
           package-manager-cache: false
 
       - run: corepack enable
@@ -101,6 +101,7 @@ jobs:
       - run: yarn lint
       - run: yarn typecheck
       # Fails when coverage drops below the thresholds in vitest.config.mts (E11-1).
+      - run: yarn tsx scripts/prepare-test-databases.mts
       - run: yarn test:coverage
       - name: Coverage summary
         if: always()
@@ -114,7 +115,7 @@ jobs:
     services:
       # The tests create and migrate their own "dossier_e2e" database here.
       postgres:
-        image: postgres:18-alpine
+        image: postgres:18.6-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -134,7 +135,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: 24.19.0
           package-manager-cache: false
 
       - run: corepack enable
@@ -154,7 +155,22 @@ jobs:
       # Headless Chromium, for the tests and for the app's PDFs.
       - run: yarn playwright install --with-deps --only-shell chromium
       - run: yarn build
+      - run: yarn tsx scripts/prepare-test-databases.mts
       - run: yarn test:e2e
+      - run: yarn test:e2e:markdown
+      - name: Build the review image
+        run: docker build --target production -t dossier-review:${{ github.sha }} .
+      - name: Exercise the exact review image
+        env:
+          DOSSIER_TEST_IMAGE: dossier-review:${{ github.sha }}
+        run: yarn test:e2e:markdown
+      - name: Save the tested image
+        run: docker save dossier-review:${{ github.sha }} | gzip > dossier-review-image.tar.gz
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dossier-review-image
+          path: dossier-review-image.tar.gz
+          retention-days: 7
 
       - uses: actions/upload-artifact@v7
         if: failure()
@@ -165,12 +181,21 @@ jobs:
             test-results/
           retention-days: 7
 
+  livesync:
+    name: Disposable LiveSync integration
+    needs: checked
+    if: ${{ !cancelled() && needs.checked.outputs.skip != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: bash deployment/livesync/test.sh
+
   # After both checks pass on main, or when its pull request passed them: the
   # production image on GHCR, tagged with the commit SHA (and "main"). A
   # version tag then tags it with the version.
   image:
     name: Production image
-    needs: [checked, check, e2e]
+    needs: [checked, check, e2e, livesync]
     if: ${{ !cancelled() && !failure() && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
