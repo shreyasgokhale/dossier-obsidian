@@ -89,11 +89,12 @@ COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
 # Backups and export zips (mount a volume here); the server's own cache.
-RUN mkdir -p /data .next/cache && chown node:node /data .next/cache
+RUN mkdir -p /data .next/cache && chown node:node /data .next/cache \
+  && chmod -R a+rX /app
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
-COPY docker/start.sh ./start.sh
+COPY --chmod=755 docker/start.sh ./start.sh
 # Migrations, the seed, then the server (E12-3).
 CMD ["./start.sh"]
