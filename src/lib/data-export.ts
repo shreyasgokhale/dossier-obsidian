@@ -462,7 +462,7 @@ export async function buildExport(
       settings: settings.filter((setting) => !SECRET_SETTINGS.includes(setting.key) && !INSTALL_SETTINGS.includes(setting.key)),
       ...(apiKey ? { apiKey } : {}),
       ...(Object.keys(jobSourceKeys).length > 0 ? { jobSourceKeys } : {}),
-      applications,
+      applications: applications.map((item) => ({ ...item, aiProvenance: application.shape.aiProvenance.parse(item.aiProvenance) })),
       postings,
       searches,
       agentCandidates,
