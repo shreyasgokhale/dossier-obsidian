@@ -441,6 +441,9 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
     expect(await text(`Dossier/Views/${id}.md`)).toContain(
       "Documents and attachments",
     );
+    expect(await text(`Dossier/Views/${id}.md`)).toContain(
+      `/api/pdf?doc=resume&application=${id}`,
+    );
   });
   it("restores applications, follow-ups, snapshots and mappings from a versioned backup", async () => {
     const id = await adopt();

@@ -88,6 +88,12 @@ describe("GET /api/pdf", () => {
     );
   });
 
+  it("downloads documents for stable ids adopted from Markdown", async () => {
+    const response = await get("?doc=resume&application=md_existing-note_123");
+    expect(response.status).toBe(200);
+    expect(renderPdf).toHaveBeenLastCalledWith("/print/resume/md_existing-note_123");
+  });
+
   it("says which document an application doesn't have", async () => {
     vi.mocked(prisma.application.findUnique).mockResolvedValue({ company: "Ledgerly", role: "", documents: [] } as never);
     const response = await get("?doc=letter&application=app1");

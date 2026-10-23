@@ -370,7 +370,7 @@ export async function exportObsidian() {
     );
     const docs = app.documents.map(
       (d) =>
-        `- [[Dossier/Documents/${d.id}|${d.kind}]] · [PDF](${publicUrl}/api/pdf/${app.id}?doc=${d.kind === "RESUME" ? "resume" : "letter"})`,
+        `- [[Dossier/Documents/${d.id}|${d.kind}]] · [PDF](${publicUrl}/api/pdf?doc=${d.kind === "RESUME" ? "resume" : "letter"}&application=${app.id})`,
     );
     const chat = app.messages
       .map((m) => `## ${m.role} · ${m.createdAt.toISOString()}\n\n${m.text}`)
