@@ -98,6 +98,8 @@ yarn test:livesync
 
 Unit/database tests share one `_test` database: run separate invocations sequentially.
 The Markdown browser test uses `dossier_markdown_e2e` and an isolated temporary vault.
+The image variant runs on Linux Docker with host networking so its synthetic
+PostgreSQL/fake-provider services can remain bound to loopback.
 Screenshots are written to `docs/screenshots`; set `DOSSIER_SCREENSHOT_DIR` to override.
 
 ## Profiles and integration semantics

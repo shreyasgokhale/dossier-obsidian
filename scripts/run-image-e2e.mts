@@ -8,23 +8,19 @@ if (!image)
 const database = new URL(process.env.DATABASE_URL!);
 if (!database.pathname.endsWith("_e2e"))
   throw new Error("Image tests require an isolated _e2e database.");
-if (["localhost", "127.0.0.1"].includes(database.hostname))
-  database.hostname = "host.docker.internal";
 const temp = await mkdtemp(path.join(os.tmpdir(), "dossier-image-test-"));
 const envFile = path.join(temp, "runtime.env");
-const fakeUrl = new URL(process.env.DOSSIER_AI_URL!);
-fakeUrl.hostname = "host.docker.internal";
 const values = {
   ...Object.fromEntries(
     Object.entries(process.env).filter(([key]) => key.startsWith("DOSSIER_")),
   ),
   DATABASE_URL: database.toString(),
-  DOSSIER_AI_URL: fakeUrl.toString(),
+  DOSSIER_AI_URL: process.env.DOSSIER_AI_URL!,
   DOSSIER_NOTES_ROOT: "/notes",
   DOSSIER_RESUME_ROOT: "/resume",
   DOSSIER_DATA_DIR: "/data",
-  PORT: "3000",
-  HOSTNAME: "0.0.0.0",
+  PORT: "3100",
+  HOSTNAME: "127.0.0.1",
 };
 await writeFile(
   envFile,
@@ -42,10 +38,10 @@ const args = [
   `${process.getuid?.() ?? 1000}:${process.getgid?.() ?? 1000}`,
   "--name",
   name,
-  "--add-host",
-  "host.docker.internal:host-gateway",
-  "-p",
-  "127.0.0.1:3100:3000",
+  // Linux CI and the target Linux VM: reach loopback-only synthetic services
+  // without exposing their PostgreSQL or fake-provider ports on a bridge.
+  "--network",
+  "host",
   "--env-file",
   envFile,
   "--mount",
