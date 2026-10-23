@@ -69,6 +69,19 @@ RUN --mount=type=secret,id=proxy_ca \
     --outfile=/tools/hash-password.mjs --banner:js='#!/usr/bin/env node' \
   && chmod 755 /tools/hash-password.mjs
 
+# Isolated synthetic review: baked source, browser and test tooling; no host mounts.
+FROM dev AS review
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends iptables iproute2 util-linux \
+  && rm -rf /var/lib/apt/lists/*
+COPY --chown=node:node . .
+RUN chmod -R a+rX /app && mkdir -p /review && chown node:node /review \
+  && corepack enable && yarn --version
+USER node
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN yarn prisma generate
+CMD ["sleep", "infinity"]
+
 FROM base AS production
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \

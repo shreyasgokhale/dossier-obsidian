@@ -5,6 +5,69 @@ This fork starts at Dossier 1.8.1, upstream commit
 provider abstraction, PostgreSQL store and history retained. No private vault,
 website checkout, credentials, Rust or Pi runtime is needed.
 
+## Container-only synthetic review
+
+Use this review stack when no host folders or private vaults may enter the app.
+Start Docker/OrbStack first. The host only orchestrates Docker, packages the
+explicit source allowlist, and copies synthetic reports out. Node, Yarn,
+PostgreSQL, Chromium and all fixture mutations run inside containers.
+
+The stack uses a private network namespace with IPv4/IPv6 outbound-deny rules,
+including blocked Docker DNS forwarding. Services communicate over loopback.
+A Docker bridge permits localhost publishing; the namespace firewall blocks
+new outbound connections on every interface.
+Only `127.0.0.1:3200` is published. There are no host bind mounts, Docker sockets,
+private environment files, host networking or privileged workload containers.
+A trusted firewall bootstrap drops its privileges and all capabilities before
+becoming healthy. Dependency/image downloads happen during preparation; runtime
+traffic cannot reach the host, LAN or internet.
+
+Build and run the complete checks sequentially:
+
+```sh
+python3 docker/review/source.py review
+docker compose --env-file /dev/null -f compose.review.yml --profile checks up -d checks
+python3 docker/review/inspect.py
+docker compose --env-file /dev/null -f compose.review.yml exec -T checks bash docker/review/check.sh
+```
+
+The source packager includes only allowed source/configuration files from Git's
+tracked files and this harness's explicitly named new files. It rejects symlink
+paths and excludes `.env*`,
+Git metadata, generated files, authentication state and unrelated local data.
+The review image enables Corepack and uses Node 24.19.0 / Yarn 4.18.1. Reports,
+fixture checksums, browser traces and screenshots stay in the `runtime` volume.
+Tests preserve the existing skips, timeouts and coverage thresholds. Live model
+and external-service checks are outside this synthetic review.
+
+Then build the production image and exercise the same complete Markdown browser
+workflow against it, using a separate fixture copy:
+
+```sh
+python3 docker/review/source.py production
+docker compose --env-file /dev/null -f compose.review.yml --profile demo up -d demo
+docker compose --env-file /dev/null -f compose.review.yml exec -T -e MARKDOWN_E2E_ROOT=/review/demo -e DOSSIER_SCREENSHOT_DIR=/review/reports/production/screenshots checks yarn playwright test -c playwright.review.config.ts
+python3 docker/review/inspect.py
+mkdir -p work/isolated-review/reports
+docker compose --env-file /dev/null -f compose.review.yml cp checks:/review/reports/. work/isolated-review/reports/
+```
+
+Open **http://localhost:3200**, password **e2e-password**. All identities and
+provider keys are synthetic. The production app's resume source volume is read
+only; notes and recovery data are writable Docker volumes. The browser workflow
+resets its explicitly disposable `_e2e` database. Run it only before manually
+exploring the demo. Stop the `checks` container after exporting evidence; the
+firewall, database, fake services and demo stay running.
+
+Stop and remove only this review stack and its disposable volumes:
+
+```sh
+docker compose --env-file /dev/null -f compose.review.yml --profile checks --profile demo down --volumes
+```
+
+This command leaves unrelated containers, images, build caches and local files
+alone. No Obsidian process, vault, LiveSync bridge or real provider is involved.
+
 ## Native development and isolated demo
 
 Use Node **24.19.0**, Yarn **4.18.1** (packageManager), PostgreSQL **18.6**.

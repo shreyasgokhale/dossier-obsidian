@@ -1,8 +1,57 @@
 # Implementation status
 
 Specification: [implementation-spec.md](implementation-spec.md). Updated 2026-10-23.
-Branch: `feature/configurable-markdown`; no push, merge or production deployment.
+Branch: `feature/configurable-markdown`; pushes are limited to this feature branch.
+No merge or production deployment.
 Starting upstream: `4fd532973be9ecbae43b55de5e0c3e681f07e493` (Dossier 1.8.1).
+
+## Container-only review — 2026-10-23
+
+Fresh verification on the feature branch used only synthetic fixtures and fake AI.
+No Obsidian process, private vault, real credentials or external provider was used.
+
+| Check | Result |
+|---|---|
+| Node / Yarn | 24.19.0 / 4.18.1; Corepack enabled; immutable install and Prisma generation passed |
+| Lint / typecheck / production build | Passed inside Docker |
+| Full tests with unchanged coverage thresholds | 1,552 passed; 26 pre-existing optional live tests skipped; 189 passed files, 4 skipped |
+| Coverage | Statements 87.20%, branches 81.22%, functions 86.00%, lines 89.46%; all thresholds passed |
+| Upstream browser suite | All 123 passed in one run (2.4m) |
+| Complete Markdown workflow in review container | Passed (45.6s scenario / 47.5s total) |
+| Same complete workflow against production image | Passed (47.6s scenario / 48.0s total) |
+| Real process restart recovery | Two restarts passed; independent edits merged; interrupted input retained and retryable; record counts unchanged |
+| Committed fixtures | Checksums unchanged after all checks |
+| Final preview after network correction | Login, dashboard, connected Markdown settings, generated document and valid PDF passed |
+| Isolation | Only named volumes; no host binds/socket or host namespaces; non-root workloads, zero capabilities and no privilege escalation; host/LAN/internet probes blocked |
+| Production source protection | Resume source writes fail with EROFS; app root filesystem read only |
+
+Production image: `dossier-isolated-demo:local`, Linux arm64, image ID
+`sha256:3ef8179d2bb080f8f08c9315675b0b617f25905f9bc2e8ef316f0007f6980dde`.
+Base revision: `3dc5d79709162984432c56e06a2feae815885145` plus the review harness.
+The image's recorded source SHA256 is
+`62aea59012e2734923979efd6ba20d55cbc9d1152e99806da575c72259fc7dcd`;
+the full allowlist/checksum manifest is in `work/isolated-review`.
+The review runner was image `sha256:5e29fe9346c845aeeda5fbb93d574d10b14cf16b430a04ea7af1e4d6df7fb419`.
+Host-side source-packager/inspection refinements are included in the review tooling.
+
+The first fully internal Docker network suppressed localhost port publication.
+The final configuration uses a bridge with IPv4/IPv6 outbound-deny firewall rules.
+The trusted bootstrap drops root and all capabilities; only loopback service
+connections and replies to inbound preview requests are permitted. Final host
+HTTP, browser, capability, mount and outbound-connectivity checks passed after
+recreating the network. Only `127.0.0.1:3200` is published.
+
+Eight fresh production screenshots are in [screenshots/isolated-review](screenshots/isolated-review).
+Detailed logs, final isolation inspections, firewall rules, image metadata,
+fixture hashes and a synthetic PDF are in ignored `work/isolated-review`.
+Reproduction and project-scoped cleanup commands are in
+[markdown-runbook.md](markdown-runbook.md#container-only-synthetic-review).
+
+The synthetic demo remains at **http://localhost:3200**, password **e2e-password**.
+Next concrete step: review the screens and try adopting `frontmatter/try-it.md`
+or `labeled/try-it.md` in Settings → Markdown integration. These are writable
+fixture copies in Docker storage. Real-model quality and real Obsidian integration
+remain outside this review. No merge, publication or private deployment occurred.
 
 ## Milestones and acceptance checklist
 
