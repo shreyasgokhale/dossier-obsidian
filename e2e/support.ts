@@ -44,6 +44,9 @@ export function appEnv(): Record<string, string> {
     DOSSIER_AI_URL: `http://localhost:${FAKE_AI_PORT}/v1`,
     DOSSIER_AI_MODEL: "fake-model",
     DOSSIER_AI_KEY: "e2e-fake-key",
+    // Consent tests must exercise the app's question even when a developer's
+    // .env forces telemetry off. Pings are routed only to the fake service.
+    DOSSIER_TELEMETRY: "",
     // Find jobs searches the fake job sources (E14-9).
     DOSSIER_JOBS_SOURCE: "jsearch",
     DOSSIER_JSEARCH_KEY: "e2e-jsearch-key",
