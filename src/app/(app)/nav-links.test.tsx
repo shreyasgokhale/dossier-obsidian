@@ -31,6 +31,7 @@ describe("NavLinks", () => {
       "Find jobs",
       "Startups",
       "Agent",
+      "Daily digest",
       "Applications",
       "Inbox",
       "Settings",

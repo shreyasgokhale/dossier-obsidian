@@ -28,6 +28,7 @@ describe("document dates", () => {
 describe("stored settings", () => {
   it("reads an empty table as the prototype's defaults", () => {
     expect(settingsFromRows([])).toEqual({
+      searchPreferences: null,
       provider: null,
       baseUrl: null,
       model: null,

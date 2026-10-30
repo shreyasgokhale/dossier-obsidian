@@ -1,0 +1,64 @@
+{
+  "runtime": "/tmp/dossier-demo-TfHREk",
+  "database": "dossier_demo_a6f25ab63ba6",
+  "url": "http://localhost:3200/digest",
+  "counts": {
+    "digests": "1",
+    "digest_items": "5",
+    "applications": "9",
+    "application_notes": "9",
+    "auto_drafts": "0"
+  },
+  "strongCards": 4,
+  "summary": {
+    "id": "cmvvlqj13000166plpo3aem08",
+    "demo": true,
+    "message": "4 strong matches, 1 stretch role. 5 scored; 0 deferred by the scoring limit; 0 scoring failures; 1 source needs attention.",
+    "sources": [
+      {
+        "count": 2,
+        "source": "Arbeitnow",
+        "status": "ok",
+        "message": ""
+      },
+      {
+        "count": 2,
+        "source": "Daily Berlin Jobs",
+        "status": "ok",
+        "message": ""
+      },
+      {
+        "count": 1,
+        "source": "Demo Greenhouse Studio (greenhouse)",
+        "status": "ok",
+        "message": ""
+      },
+      {
+        "count": 1,
+        "source": "Demo Ashby Tools (ashby)",
+        "status": "ok",
+        "message": ""
+      },
+      {
+        "count": 0,
+        "source": "Demo unavailable board (lever)",
+        "status": "failed",
+        "message": "Company career boards isn't answering right now. Try again in a minute."
+      }
+    ]
+  },
+  "digestAxe": [],
+  "preferencesAxe": [],
+  "darkDigestAxe": [],
+  "darkPreferencesAxe": [],
+  "markdownRoundTrip": true,
+  "careerUnchanged": true,
+  "browserErrors": [],
+  "noteFiles": [
+    "Applications",
+    "Dossier",
+    "Search Preferences.md",
+    "frontmatter",
+    "labeled"
+  ]
+}

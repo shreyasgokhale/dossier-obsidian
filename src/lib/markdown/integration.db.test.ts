@@ -538,7 +538,7 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
     await reconcile();
     const original = await text();
     const exported = await buildExport(db());
-    expect(exported.schemaVersion).toBe(6);
+    expect(exported.schemaVersion).toBe(7);
     const parsed = parseExport(JSON.stringify(exported));
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) throw new Error(parsed.error);

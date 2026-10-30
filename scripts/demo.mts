@@ -22,6 +22,8 @@ try {
   await admin.end();
 }
 base.pathname = `/${database}`;
+const digestMode = process.argv.includes("--digest");
+const jobsPort = Number(process.env.DEMO_JOBS_PORT ?? 3995);
 const port = Number(process.env.DEMO_PORT ?? 3200),
   fakePort = Number(process.env.DEMO_AI_PORT ?? 3996);
 const env = {
@@ -39,6 +41,12 @@ const env = {
   DOSSIER_AI_KEY: "synthetic-demo-key",
   DOSSIER_TELEMETRY: "off",
   DOSSIER_JOBS_SOURCE: "off",
+  ...(digestMode
+    ? {
+        DOSSIER_JOBS_TEST_BASE_URL: `http://127.0.0.1:${jobsPort}`,
+        DOSSIER_UPDATES_TEST_BASE_URL: `http://127.0.0.1:${jobsPort}/github`,
+      }
+    : {}),
   DOSSIER_PUBLIC_URL: `http://localhost:${port}`,
   PORT: String(port),
   HOSTNAME: "127.0.0.1",
@@ -76,6 +84,47 @@ for (const args of [
   ["prisma", "db", "seed", "--", "--demo"],
 ])
   execFileSync("yarn", args, { env, stdio: "inherit" });
+if (digestMode) {
+  const pool = new Pool({ connectionString: base.toString() });
+  const preferences = {
+    roles: ["Product Designer"],
+    locations: [{ place: "Berlin", country: "de" }],
+    remote: "any",
+    exclusions: [],
+    interests: ["Design systems", "Climate technology"],
+    sources: ["ARBEITNOW", "DAILY_BERLIN", "COMPANY_BOARDS"],
+    boards: [
+      { name: "Demo Greenhouse Studio", provider: "greenhouse", slug: "demo" },
+      { name: "Demo Ashby Tools", provider: "ashby", slug: "demo" },
+      {
+        name: "Demo unavailable board",
+        provider: "lever",
+        slug: "unavailable",
+      },
+    ],
+  };
+  try {
+    for (const [key, value] of Object.entries({
+      searchPreferences: JSON.stringify(preferences),
+      agentEnabled: "true",
+      agentHour: "0",
+      agentAutoDraft: "false",
+      browserTimeZone: "Europe/Berlin",
+    }))
+      await pool.query(
+        'INSERT INTO "Setting" (key,value,"updatedAt") VALUES ($1,$2,now()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value',
+        [key, value],
+      );
+  } finally {
+    await pool.end();
+  }
+}
+const jobs = digestMode
+  ? spawn(process.execPath, ["e2e/fake-jobs.mts"], {
+      env: { ...env, FAKE_JOBS_PORT: String(jobsPort) },
+      stdio: "inherit",
+    })
+  : null;
 const fake = spawn(process.execPath, ["e2e/fake-ai.mts"], {
   env: { ...env, FAKE_AI_PORT: String(fakePort) },
   stdio: "inherit",
@@ -98,9 +147,11 @@ console.log(
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => {
     fake.kill(signal);
+    jobs?.kill(signal);
     app.kill(signal);
   });
 app.on("exit", (code) => {
   fake.kill();
+  jobs?.kill();
   process.exitCode = code ?? 0;
 });

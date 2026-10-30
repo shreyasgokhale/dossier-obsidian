@@ -4,6 +4,7 @@ import { reconcile } from "./service";
 import { syncDocuments, exportObsidian } from "./documents";
 import { watch } from "node:fs";
 import { logServerError } from "@/lib/log";
+vi.mock("./search-preferences", () => ({ syncSearchPreferences: vi.fn(async () => {}) }));
 vi.mock("./service", () => ({ reconcile: vi.fn(async () => ({ linked: 1 })) }));
 vi.mock("./documents", () => ({
   syncDocuments: vi.fn(async () => {}),

@@ -31,7 +31,7 @@ function fieldsOf(found: FoundPosting) {
 }
 
 /** A stored posting in the shape search results have. */
-export function foundFromPosting(posting: Posting): FoundPosting {
+export function foundFromPosting(posting: Pick<Posting, "source" | "externalId" | "title" | "company" | "place" | "remote" | "salary" | "postedAt" | "url" | "via" | "description" | "complete">): FoundPosting {
   return {
     source: posting.source,
     externalId: posting.externalId,

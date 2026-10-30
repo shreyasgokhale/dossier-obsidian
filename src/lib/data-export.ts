@@ -41,10 +41,10 @@ import { appVersion } from "@/lib/version";
 // behind: they belong to the server or the mailbox, not the user's data.
 
 export const EXPORT_FORMAT = "dossier-export";
-/** Bump when the file's shape changes; imports refuse versions they don't know. 2 added Find jobs' postings and keys (E14-9), 3 projects (PRO-13) and the job agent (E16), 4 facts (PRO-14, APP-15), 5 publications (#218), the profile photo's theme and application options (#224) and Startups (#222), 6 the line about a role's company (#257). */
-export const EXPORT_SCHEMA_VERSION = 6;
+/** Bump when the file's shape changes; imports refuse versions they don't know. 2 added Find jobs' postings and keys (E14-9), 3 projects (PRO-13) and the job agent (E16), 4 facts (PRO-14, APP-15), 5 publications (#218), the profile photo's theme and application options (#224) and Startups (#222), 6 the line about a role's company (#257), 7 daily digests and preference synchronization. */
+export const EXPORT_SCHEMA_VERSION = 7;
 /** The versions imports can read. */
-export const EXPORT_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6];
+export const EXPORT_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
 
 /** The setting that holds the encrypted API key, which only this server can read. */
 const API_KEY_SETTING = "apiKeyEnc";
@@ -254,6 +254,7 @@ const agentCandidate = z.object({
   error: text.nullable(),
   applicationId: text.nullable(),
   dedupeKey: text,
+  identityKeys: z.array(text).default([]),
   createdAt: date,
   updatedAt: date,
 });
@@ -333,9 +334,12 @@ const markdownExport = z.object({
 });
 
 export const exportSchema = z.object({
+  dailyDigests: z.array(z.object({ id: text, startedAt: date, finishedAt: optionalDate, demo: z.boolean(), preferences: z.unknown(), discovered: z.unknown().default([]), sources: z.unknown(), message: text })).default([]),
+  digestItems: z.array(z.object({ digestId: text, candidateId: text, kind: z.enum(["strong", "stretch", "below"]) })).default([]),
+  searchPreferenceSync: z.array(z.object({ id: text, snapshot: z.unknown().nullable(), fileHash: text.nullable(), conflict: z.unknown().nullable(), error: text.nullable(), updatedAt: date })).default([]),
   markdown: markdownExport.optional(),
   format: z.literal(EXPORT_FORMAT),
-  schemaVersion: z.literal([1, 2, 3, 4, 5, 6]),
+  schemaVersion: z.literal([1, 2, 3, 4, 5, 6, 7]),
   appVersion: text,
   exportedAt: date,
   profile: z.object({
@@ -389,7 +393,7 @@ export async function buildExport(
   { includeApiKey = false, now = new Date() }: { includeApiKey?: boolean; now?: Date } = {},
 ): Promise<DossierExport> {
   return db.$transaction(async (tx) => {
-    const [fields, skills, languages, experience, projects, education, publications, references, facts, themes, settings, applications, postings, searches, agentCandidates, startups, startupBlocks, markdownProfiles, markdownLinks, markdownDocuments, markdownWork, resumeSources] = await Promise.all([
+    const [fields, skills, languages, experience, projects, education, publications, references, facts, themes, settings, applications, postings, searches, agentCandidates, startups, startupBlocks, markdownProfiles, markdownLinks, markdownDocuments, markdownWork, resumeSources, dailyDigests, digestItems, searchPreferenceSync] = await Promise.all([
       tx.profileField.findMany({ select: { key: true, value: true }, orderBy: { key: "asc" } }),
       tx.skill.findMany({ select: { id: true, name: true, sort: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
       tx.language.findMany({ select: { id: true, name: true, level: true, sort: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
@@ -422,7 +426,7 @@ export async function buildExport(
       tx.agentCandidate.findMany({ orderBy: { createdAt: "asc" } }),
       tx.startup.findMany({ orderBy: { createdAt: "asc" } }),
       tx.startupBlock.findMany({ orderBy: { createdAt: "asc" } }),
-      tx.markdownProfile.findMany(), tx.markdownLink.findMany(), tx.markdownDocument.findMany(), tx.markdownWork.findMany(), tx.resumeSource.findMany(),
+      tx.markdownProfile.findMany(), tx.markdownLink.findMany(), tx.markdownDocument.findMany(), tx.markdownWork.findMany(), tx.resumeSource.findMany(), tx.dailyDigest.findMany(), tx.digestItem.findMany(), tx.searchPreferenceSync.findMany(),
     ]);
 
     // Keys only when asked for, decrypted; one that's unreadable here too (DOSSIER_SECRET changed) has nothing to export.
@@ -466,6 +470,7 @@ export async function buildExport(
       postings,
       searches,
       agentCandidates,
+      dailyDigests, digestItems: digestItems.map(i => ({ ...i, kind: i.kind as "strong" | "stretch" | "below" })), searchPreferenceSync,
       startups,
       startupBlocks,
       markdown: { profiles: markdownProfiles.map((p) => ({ ...p, config: profileSchema.parse(p.config), draft: p.draft ? profileSchema.parse(p.draft) : null })), links: markdownLinks, documents: markdownDocuments, work: markdownWork, resumeSources },

@@ -15,6 +15,7 @@
     "test:e2e": "playwright test",
     "hash-password": "tsx scripts/hash-password.ts",
     "demo": "tsx scripts/demo.mts",
+    "demo:digest": "tsx scripts/demo.mts --digest",
     "test:markdown": "vitest run src/lib/markdown",
     "test:e2e:markdown": "playwright test -c playwright.markdown.config.ts",
     "demo:resume": "tsx scripts/resume-demo.mts",

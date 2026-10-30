@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { searchPreferencesSchema } from "@/lib/digest/preferences";
 
 import { AiProvider, Creativity, DateFormat, PaperSize, Tone } from "@/generated/prisma/enums";
 import { EMPTY_QUERY, JOB_SOURCES, JSEARCH_HOSTS, searchQuerySchema } from "@/lib/job-search/search";
@@ -100,6 +101,7 @@ export type AgentRun = z.infer<typeof agentRunSchema>;
 export const AGENT_RUNS_KEPT = 10;
 
 export const settingsSchema = z.object({
+  searchPreferences: json(searchPreferencesSchema).nullable().catch(null),
   // AI provider (SET-1). Null means "not set in the app": fall back to the
   // DOSSIER_AI_* environment variables, then to the built-in defaults.
   provider: z.enum(AiProvider).nullable().catch(null),

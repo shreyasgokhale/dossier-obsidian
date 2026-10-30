@@ -590,6 +590,9 @@ enum PostingSource {
   ADZUNA
   ARBEITSAGENTUR
   FREEHIRE
+  ARBEITNOW
+  DAILY_BERLIN
+  COMPANY_BOARDS
 }
 
 /// A posting from Find jobs that the user kept (E14-5): saved, dismissed, or
@@ -649,6 +652,8 @@ model ClaudePaste {
 /// it. Kept after it's dismissed, trimmed to what dedupe needs, so the same
 /// posting never comes back.
 model AgentCandidate {
+  identityKeys String[] @default([])
+  digestItems DigestItem[]
   id            String               @id @default(cuid())
   source        PostingSource
   /// The source's own id for it.
@@ -991,5 +996,36 @@ model ResumeSource {
   contentHash String
   content Json
   targetId String?
+  updatedAt DateTime @updatedAt
+}
+
+/// Durable daily discovery results, independent of background job retention.
+model DailyDigest {
+  id String @id @default(cuid())
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  demo Boolean @default(false)
+  preferences Json
+  discovered Json @default("[]")
+  sources Json
+  message String @default("")
+  items DigestItem[]
+  @@index([startedAt])
+}
+model DigestItem {
+  digestId String
+  digest DailyDigest @relation(fields: [digestId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate AgentCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  kind String
+  @@id([digestId, candidateId])
+}
+/// Three-way merge baseline and durable conflict/retry state for the preferences note.
+model SearchPreferenceSync {
+  id String @id @default("preferences")
+  snapshot Json?
+  fileHash String?
+  conflict Json?
+  error String?
   updatedAt DateTime @updatedAt
 }

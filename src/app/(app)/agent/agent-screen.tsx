@@ -101,6 +101,7 @@ export function AgentScreen({ view }: { view: AgentView }) {
         }
       />
       <div className="flex flex-col gap-8 px-10 pb-20">
+        <Link href="/digest" className="text-sm underline">Daily digest and Search Preferences →</Link>
         <Notices view={view} />
 
         <Card padding="none" className="px-7 py-2">

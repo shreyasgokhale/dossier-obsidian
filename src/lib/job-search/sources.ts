@@ -47,7 +47,11 @@ export type SourceInfo = {
   radius: boolean;
 };
 
+const publicSource = (name: string, description: string, countries: string[] | null = null): SourceInfo => ({ name, description, countries, tag: "Public API · no key · no distance filter", keyUrl: null, quotaPeriod: null, attribution: `Source: ${name}`, attributionLink: null, radius: false });
 export const SOURCE_INFO: Record<JobSource, SourceInfo> = {
+  ARBEITNOW: publicSource("Arbeitnow", "Public Germany job board; filtered locally.", ["de"]),
+  DAILY_BERLIN: publicSource("Daily Berlin Jobs", "Berlin postings; descriptions may be unavailable.", ["de"]),
+  COMPANY_BOARDS: publicSource("Company career boards", "Enabled Greenhouse, Lever and Ashby boards from Search Preferences."),
   JSEARCH: {
     name: "JSearch",
     description: "Postings from LinkedIn, Indeed, Glassdoor and company sites, through Google for Jobs.",

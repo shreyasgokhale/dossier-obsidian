@@ -99,6 +99,8 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
       await tx.job.deleteMany();
       await tx.posting.deleteMany();
       await tx.postingSearch.deleteMany();
+      await tx.dailyDigest.deleteMany();
+      await tx.searchPreferenceSync.deleteMany();
       await tx.agentCandidate.deleteMany();
       await tx.startup.deleteMany();
       await tx.startupBlock.deleteMany();
@@ -222,6 +224,9 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
           applicationId: candidate.applicationId && applicationIds.has(candidate.applicationId) ? candidate.applicationId : null,
         })),
       });
+      await tx.dailyDigest.createMany({ data: data.dailyDigests.map(d => ({ ...d, preferences: requiredJson(d.preferences), discovered: requiredJson(d.discovered), sources: requiredJson(d.sources) })) });
+      await tx.digestItem.createMany({ data: data.digestItems });
+      await tx.searchPreferenceSync.createMany({ data: data.searchPreferenceSync.map(s => ({ ...s, snapshot: json(s.snapshot), conflict: json(s.conflict) })) });
       // Startups (#222) with what the user did with them; an application that isn't in the file leaves one unlinked.
       await tx.startup.createMany({
         data: startups.map((startup) => ({

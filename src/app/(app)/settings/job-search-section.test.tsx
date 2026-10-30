@@ -36,13 +36,16 @@ beforeEach(() => {
 });
 
 describe("JobSearchSection", () => {
-  it("offers the four sources and Off, as a radio group, Off by default", () => {
+  it("offers the supported sources and Off, as a radio group, Off by default", () => {
     render(<JobSearchSection initial={off} />);
     expect(screen.getByRole("heading", { name: "Job search" })).toBeInTheDocument();
     expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual([
       "JSearch",
       "Adzuna",
       "FreeHire",
+      "Arbeitnow",
+      "Daily Berlin Jobs",
+      "Company career boards",
       "Bundesagentur für Arbeit",
       "Off",
     ]);
@@ -128,7 +131,7 @@ describe("JobSearchSection", () => {
 
   it("leaves the Arbeitsagentur out when the server doesn't offer it", () => {
     render(<JobSearchSection initial={withSource({ arbeitsagentur: { offered: false, acceptedAt: null } })} />);
-    expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(["JSearch", "Adzuna", "FreeHire", "Off"]);
+    expect(screen.getAllByRole("radio").map((radio) => radio.getAttribute("aria-label"))).toEqual(["JSearch", "Adzuna", "FreeHire", "Arbeitnow", "Daily Berlin Jobs", "Company career boards", "Off"]);
   });
 
   it("says which FreeHire it searches, with no key to ask for", () => {

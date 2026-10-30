@@ -3,6 +3,7 @@
 // (DOSSIER_JOBS_TEST_BASE_URL), and this answers in that source's own shape,
 // so the adapters' real request and response handling runs end to end.
 
+import { digestFixture } from "./digest-fixtures.mts";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
 const port = Number(process.env.FAKE_JOBS_PORT ?? 3998);
@@ -89,6 +90,8 @@ const pings: unknown[] = [];
 
 createServer((request, response) => {
   const url = new URL(request.url ?? "/", `http://localhost:${port}`);
+  const digest = digestFixture(url.pathname);
+  if(digest) return send(response,digest.status,digest.body);
   if (url.pathname === "/health") return send(response, 200, { ok: true });
   if (url.pathname === "/searches") return send(response, 200, { searches });
   if (url.pathname === "/pings") return send(response, 200, { pings });

@@ -33,6 +33,8 @@ It's for one person on a small server: one password, your data in your own Postg
 
 ## Features
 
+This fork also includes a [daily job digest and Search Preferences](docs/daily-job-digest.md), with a reproducible synthetic preview: `yarn demo:digest --production` after building. Discovery keeps jobs in Dossier until you choose to start an application.
+
 - **Profile:** basics, skills and languages, experience, projects, education, publications and references, in the order you choose, with a strength meter that counts only what a profile needs. Projects (side, open-source, course or thesis work) show what you can do where your job titles don't yet. Publications are cited in your own style, with bold and italics, and go on resumes word for word. Start it from an existing resume (PDF, Word or Markdown) if you like.
 - **Base resume:** twelve themes and a theme builder, previewed live and printed to PDF on the server. Duplicate themes, or share them as files.
 - **Find jobs:** search postings near your city, or anywhere you choose, through JSearch (LinkedIn, Indeed and more), Adzuna or FreeHire (company career pages). Save the good ones, dismiss the rest, score any of them against your profile, and start an application from a posting with one click.
