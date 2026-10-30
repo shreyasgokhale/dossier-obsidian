@@ -514,10 +514,8 @@ export async function resolveConflict(
       where: { applicationId },
       include: { profile: true },
     });
-    if (link.profile.paused)
-      throw new MarkdownError(
-        "Review and activate the format profile before resolving conflicts.",
-      );
+    // A pending draft pauses reconciliation, but existing conflicts must remain
+    // resolvable with the active config before the draft can be activated.
     const text = await readNote(notesRoot(), link.path);
     if (hash(text) !== expected)
       throw new MarkdownError(

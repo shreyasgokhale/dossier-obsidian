@@ -205,3 +205,26 @@ lint, typecheck, and production build pass. Full Vitest run with one worker:
 services and a separate dossier_e2e database: all 138 passed. Database tests used
 only dossier_test. No private vaults, external AI, merge, or deployment used.
 Next step: review and merge PR #1 after GitHub CI completes.
+
+### PR #1 Codex review fixes
+
+Document synchronization now locks each Document row and rereads its current units
+before computing the three-way merge. The lock remains held through the domain
+writer, file update and snapshot update, preserving app/AI edits committed after
+the initial scan. Conflict resolution uses the active profile configuration even
+while a draft pauses reconciliation, allowing existing conflicts to be cleared
+before reviewing and activating the draft.
+
+Two PostgreSQL/filesystem regression tests reproduce the reported failures: an
+app edit committed between the initial scan and merge, and an existing conflict
+resolved while a property-renaming draft is paused. Both fail against the prior
+implementation and pass with these fixes. All 18 Markdown integration tests,
+immutable Yarn install, Prisma generation, lint, typecheck and production build
+pass. Full Vitest validation: 1,773 passed, 29 skipped (213 files passed,
+4 skipped). All 138 standard Playwright tests and the complete synthetic
+Markdown/resume/AI browser workflow pass. Tests use synthetic fixtures, fake
+services and disposable dossier_codex_test, dossier_codex_e2e and
+dossier_markdown_e2e databases.
+
+Next step: inspect GitHub CI on the updated PR #1. No merge or deployment
+performed.

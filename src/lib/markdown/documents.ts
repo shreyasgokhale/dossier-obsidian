@@ -81,7 +81,19 @@ export async function syncDocuments() {
         application: { include: { markdown: { include: { profile: true } } } },
       },
     });
-    for (const doc of docs) {
+    for (const candidate of docs) {
+      // The initial scan can go stale while an app or AI writer saves units.
+      // Lock, then reread before merging; hold the lock through the file and
+      // snapshot writes so they describe the same document revision.
+      await tx.$queryRaw`SELECT 1 FROM "Document" WHERE id = ${candidate.id} FOR UPDATE`;
+      const doc = await tx.document.findUnique({
+        where: { id: candidate.id },
+        include: {
+          markdown: true,
+          application: { include: { markdown: { include: { profile: true } } } },
+        },
+      });
+      if (!doc || !doc.application.markdown) continue;
       if (doc.application.markdown?.profile.paused) continue;
       const units = unitsSchema.parse(doc.units);
       const file = doc.markdown?.path ?? `Dossier/Documents/${doc.id}.md`;

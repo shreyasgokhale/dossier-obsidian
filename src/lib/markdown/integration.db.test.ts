@@ -296,6 +296,37 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
     await reconcile();
     expect((await link(id)).state).toBe("linked");
   });
+  it("resolves existing conflicts with the active format while a profile draft is paused", async () => {
+    const id = await adopt();
+    await db().application.update({
+      where: { id }, data: { company: "App company" },
+    });
+    await edit(fmFile, { company: "File company" });
+    await reconcile();
+    expect((await link(id)).state).toBe("conflict");
+    await stageProfile("default-frontmatter", {
+      ...defaultProfile,
+      fields: { ...defaultProfile.fields, company: "employer" },
+    });
+    expect((await profileReview("default-frontmatter")).files[0].error).toBeTruthy();
+    await resolveConflict(id, { company: "file" }, hash(await text()));
+    expect((await app(id)).company).toBe("File company");
+    expect((await link(id)).conflict).toBeNull();
+    const paused = await db().markdownProfile.findUniqueOrThrow({
+      where: { id: "default-frontmatter" },
+    });
+    expect(paused.paused).toBe(true);
+    expect(paused.draft).not.toBeNull();
+    expect(await text()).toContain('company_name: "File company"');
+    expect(await text()).not.toContain("employer:");
+    const review = await profileReview("default-frontmatter");
+    expect(review.files[0].error).toBeNull();
+    await activateProfile("default-frontmatter", review.token);
+    expect(await text()).toContain('employer: "File company"');
+    expect((await db().markdownProfile.findUniqueOrThrow({
+      where: { id: "default-frontmatter" },
+    })).paused).toBe(false);
+  });
   it("requires dry-run review for property renames and rejects stale approval tokens", async () => {
     const id = await adopt();
     const before = await text();
@@ -368,6 +399,55 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
       writeFileChecked(path.join(root, "notes"), row.path, "changed", "bad"),
     ).rejects.toThrow("changed since preview");
     expect((await integrationView()).links).toHaveLength(1);
+  });
+  it("merges against a document saved after the initial sync scan", async () => {
+    const id = await adopt();
+    const original = [
+      { id: "summary", label: "Summary", text: "Original summary" },
+      { id: "work", label: "Work", text: "Original work" },
+    ];
+    const doc = await db().document.create({
+      data: { applicationId: id, kind: "RESUME", units: original },
+    });
+    await syncDocuments();
+    const mapping = await db().markdownDocument.findUniqueOrThrow({
+      where: { documentId: doc.id },
+    });
+    await writeFile(path.join(root, "notes", mapping.path),
+      (await text(mapping.path)).replace("Original summary", "File summary"));
+    const client = db();
+    let injected = false;
+    // Commit an app save after the scan returns its stale units, before the
+    // importer locks and rereads the document. No timing or sleeps involved.
+    const concurrent = client.$extends({ query: { document: {
+      async findMany({ args, query }) {
+        const rows = await query(args);
+        if (args.where?.application && !injected) {
+          injected = true;
+          await client.document.update({ where: { id: doc.id }, data: {
+            units: [original[0], { ...original[1], text: "App work" }],
+          } });
+        }
+        return rows;
+      },
+    } } });
+    state.db = concurrent as unknown as typeof client;
+    try {
+      await syncDocuments();
+    } finally {
+      state.db = client;
+    }
+    expect(injected).toBe(true);
+    const expected = [{ ...original[0], text: "File summary" },
+      { ...original[1], text: "App work" }];
+    expect((await client.document.findUniqueOrThrow({
+      where: { id: doc.id },
+    })).units).toEqual(expected);
+    expect(parseDocumentUnits(await text(mapping.path), expected)).toEqual(expected);
+    expect((await client.markdownDocument.findUniqueOrThrow({
+      where: { documentId: doc.id },
+    })).snapshot).toEqual(expected);
+    expect(await client.documentVersion.count()).toBe(1);
   });
   it("round-trips document units with versions, repairs damaged markers, and resolves conflicts", async () => {
     const id = await adopt();
