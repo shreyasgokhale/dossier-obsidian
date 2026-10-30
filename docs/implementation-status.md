@@ -228,3 +228,123 @@ dossier_markdown_e2e databases.
 
 Next step: inspect GitHub CI on the updated PR #1. No merge or deployment
 performed.
+
+## Daily job digest — implementation and review handoff
+
+The newest work is on `feat/daily-job-digest`, based on `main` after checkout and
+successful `git pull --ff-only` at `23b9062` (Feature/configurable markdown #1).
+Implementation commit: `07c762c`. No merge, push, publication or deployment was performed. The initial sandbox
+connection failure was resolved using the permitted execution path; pulling is
+not an outstanding blocker. AGENTS.md and the existing search/agent/profile,
+Markdown filesystem/merge worker, application and export workflows were inspected
+before implementation.
+
+Implemented:
+
+- Search Preferences in Dossier and `Search Preferences.md`, separate from
+  career history. Roles, city/country pairs, remote intent, exclusions, interests,
+  enabled sources and configurable employer boards have deterministic schemas.
+  Synchronization reuses guarded paths, atomic writes/recovery and the existing
+  advisory lock; durable snapshots/errors/conflicts preserve concurrent versions.
+- Multi-source discovery through existing JSearch, Adzuna and FreeHire adapters,
+  plus Arbeitnow, Daily Berlin Jobs and configured Greenhouse/Lever/Ashby boards.
+  Source/board failures and individual scoring failures preserve successful
+  results. Connection testing makes real board requests; no configured board is
+  reported connected without an HTTP check. BA remains interactive only, as
+  upstream explicitly requires.
+- Durable daily digests, discovery snapshots, profile-based fit reasons, missing
+  information/gaps, strong matches and at most three best stretch roles. The
+  existing agent job runner, timer, time zone, scoring cap and run limits are used.
+  Interrupted runs recover at startup. Digest discovery never enqueues drafts.
+- Canonical URL and normalized company/title identity suppression across sources,
+  saved/dismissed results and pursued applications. Dismissal/save use existing
+  Dossier storage. Start application enters the existing review/create workflow;
+  per-job Markdown starts only when an application exists.
+- Backup schema 7 includes digests, membership, discovery snapshots and identity/
+  preferences sync state; schemas 1–6 remain importable. Delete everything removes
+  the added state. The upstream transient score cache remains excluded, while
+  digest scores/reasons survive restore.
+- `yarn demo:digest --production` creates a new isolated synthetic database and
+  writable notes runtime, starts fake AI/source services, and populates four
+  strong matches plus a stretch role. Demo labels are visible in the digest and
+  history. The same vacancy from Arbeitnow/DBJ appears once; a simulated failed
+  Lever board leaves the other results intact. Existing upstream UI is retained.
+
+The reference repository was inspected at
+`umutyesildal/berlin-job-search@465f9ffd0c03cde62f898260d919c011c3c1d043`.
+Actual connector functions and API contracts were distinguished from browser
+recipes/search links. The MIT notice for endpoint/parser adaptation is retained
+in `docs/third-party/berlin-job-search-LICENSE`. No newsletter, automatic application,
+reference coaching workflow or document drafting was imported.
+
+### Verification evidence
+
+Node **24.19.0**, Yarn **4.18.1** (cached executable SHA-512 matches packageManager).
+Corepack enable was run using a workspace-writable install directory because the
+system binary directory is not writable. Immutable installation and Prisma Client
+generation passed. Additive migrations apply to empty disposable databases.
+
+- `yarn install --immutable`: passed; lockfile unchanged (existing peer warnings).
+- `yarn prisma generate`: passed, Prisma Client 7.10.1.
+- `yarn lint`: passed with no warnings.
+- `yarn typecheck`: passed, including generated Next.js route types.
+- `yarn test`: 1,799 passed / 29 opt-in-live tests skipped on the earlier full run.
+- Latest full `yarn test:coverage --maxWorkers=2`: **1,802 passed / 29 skipped**
+  (221 files passed / 4 skipped). All existing coverage thresholds are unchanged
+  and pass: global lines 88.45%, statements 86.27%, functions 84.79%, branches
+  80.05%; `src/lib` lines 95.15% (minimum 94%). A tooling warning skips the
+  non-code bundled-font README during coverage; the command exits successfully.
+- `yarn build`: passed, standalone Next.js production bundle.
+- `yarn test:e2e`: first full run 136 passed / 3 failed. The failures were in
+  existing keyboard-focus and publication-autosave tests (plus the dependent
+  publication test). Their files were not changed. Isolated rerun of both whole
+  files plus the digest flow: **9 passed**. Final full rerun on the stable production bundle: **139 passed** (5.3 minutes), including all original workflows and the new digest flow.
+- `yarn test:e2e:markdown`: **1 passed**, complete synthetic Markdown/resume/AI workflow.
+- `git diff --check`: passed.
+
+The isolated preview was verified with real Chromium and axe on both new screens:
+no accessibility violations and no browser errors. Five digest items were created
+while the nine seeded applications and nine associated Markdown notes remained
+nine, and there were zero automatic draft jobs. Screenshots are retained at
+`docs/screenshots/digest/daily-digest.png` and
+`docs/screenshots/digest/search-preferences.png`.
+
+Review the populated digest directly:
+<http://localhost:3200/digest?id=cmvvlqj13000166plpo3aem08>, password **demo-password**.
+The query pins the populated initial digest even if a later scheduled scan finds
+no new jobs. The preview remains running locally on port 3200 with fake AI on
+3996 and fake job sources on 3995. Runtime: `/tmp/dossier-demo-TfHREk`;
+database: `dossier_demo_a6f25ab63ba6`. Recreate a fresh isolated preview with
+`cd /workspace/dossier-obsidian && yarn demo:digest --production` after stopping
+the running preview. The complete build/setup command sequence is in the runbook.
+
+Both new screens also passed axe in dark mode. The running filesystem worker
+imported a synthetic preference-note edit, restored its original value, and left
+career history unchanged. Sanitized evidence is committed in
+`docs/evidence/daily-digest-preview.json` and live probe outcomes in
+`docs/evidence/daily-digest-source-probes.txt`.
+
+Exact source audit, feature behavior, limitations, reproduction and step-by-step
+review instructions are in `docs/daily-job-digest.md`. Raw command logs are in the
+ignored `work/` directory in this workspace.
+
+### Remaining limits and next concrete step
+
+Live probes to Arbeitnow, Daily Berlin Jobs, Greenhouse, Lever and Ashby all
+returned proxy CONNECT **403**, HTTP **000**. The managed outbound policy does
+not allow these hosts. These are **fixture-verified implementations**, not claims
+of successful live data retrieval; no real-source digest was generated. No bypass
+was attempted. JSearch/Adzuna also need the user's own configured credentials.
+
+Scanning is bounded to first pages (Arbeitnow one page, DBJ up to 500 rows,
+Lever up to 100; up to 10 employer boards and 12 role/location queries per source).
+DBJ detail hydration and additional reference ATS types are not implemented.
+Company boards must be configured from verified official board slugs. Locations
+are textual, with no distance/geocoding or inferred work eligibility. Dedupe
+conservatively treats one company/title across locations as one opportunity.
+The app must remain running as one instance for daily scheduling.
+
+Next concrete step: review the populated synthetic preview and feature-branch
+diff, then allow the public API hosts via the supported environment configuration
+and verify low-volume real requests with official employer slugs and any desired
+paid-source keys. Do not merge or deploy as part of this task.
