@@ -132,6 +132,7 @@ function useLeaveGuard(active: boolean, onLeave: () => void) {
 }
 
 export type NewApplicationProps = {
+  recovered?: Draft | null;
   /** Whether an AI provider is set up; without one, the page points to Settings. */
   aiReady: boolean;
   /** The Claude connector is on and Dossier has no usable AI model: a Claude chat writes it instead (#221). */
@@ -147,8 +148,8 @@ export type NewApplicationProps = {
 };
 
 /** The new application flow (E7): paste → read → review → create. */
-export function NewApplication({ aiReady, writeInClaude = false, samplePosting, defaultTone, fresh = false, fromPosting = null }: NewApplicationProps) {
-  const [initial] = useState<Draft>(() => ({
+export function NewApplication({ aiReady, writeInClaude = false, samplePosting, defaultTone, fresh = false, fromPosting = null, recovered = null }: NewApplicationProps) {
+  const [initial] = useState<Draft>(() => recovered ?? ({
     step: "paste",
     posting: "",
     postingUrl: "",
@@ -163,7 +164,7 @@ export function NewApplication({ aiReady, writeInClaude = false, samplePosting, 
   }));
   // The server renders a fresh draft; the tab's own draft takes over once the page is live.
   const stored = useSyncExternalStore(draftStore?.subscribe ?? noStore, () => draftStore?.get() ?? null, () => null);
-  const draft = stored ?? initial;
+  const draft = recovered ?? stored ?? initial;
   // Set when a change here moves to another step; the tab's draft taking over on load doesn't count.
   const stepChanged = useRef(false);
   const setDraft = (next: (current: Draft) => Draft) => {
@@ -175,6 +176,11 @@ export function NewApplication({ aiReady, writeInClaude = false, samplePosting, 
   const update = (patch: Partial<Draft>) => setDraft((current) => ({ ...current, ...patch }));
 
   const router = useRouter();
+  useEffect(() => {
+    if (!recovered) return;
+    draftStore?.set(recovered);
+    router.replace("/new");
+  }, [recovered, router]);
   useEffect(() => {
     if (!fresh) return;
     draftStore?.clear();
@@ -229,7 +235,7 @@ export function NewApplication({ aiReady, writeInClaude = false, samplePosting, 
       return;
     }
     setStarting(true);
-    const result = toastResult(await startReadingPosting({ posting: draft.posting }));
+    const result = toastResult(await startReadingPosting({ posting: draft.posting, ...(draft.postingUrl.trim() ? { postingUrl: draft.postingUrl.trim() } : {}), ...(draft.postingId ? { postingId: draft.postingId } : {}) }));
     setStarting(false);
     if (result.ok) update({ step: "reading", readJobId: result.data, readFor: draft.posting.trim(), read: null });
   };

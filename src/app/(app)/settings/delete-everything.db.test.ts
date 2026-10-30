@@ -6,6 +6,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { buildExport } from "@/lib/data-export";
 import { importExport, parseExport } from "@/lib/data-import";
+import { defaultProfile } from "@/lib/markdown/profile";
 import { createTestClient, resetDatabase } from "@/test/db";
 
 import { seedBuiltIns } from "../../../../prisma/seed/built-ins";
@@ -43,6 +44,8 @@ const snapshot = async () => JSON.stringify({ ...(await buildExport(prisma(), { 
 beforeEach(async () => {
   dataDir.path = await mkdtemp(path.join(tmpdir(), "dossier-delete-"));
   await mkdir(path.join(dataDir.path, "backups"));
+  await mkdir(path.join(dataDir.path, "markdown-recovery"));
+  await writeFile(path.join(dataDir.path, "markdown-recovery", "synthetic-note.md"), "Synthetic recovery copy");
   await writeFile(path.join(dataDir.path, "backups", "dossier-backup-nightly-2026-09-27-030000.json"), "{}");
   redirected.to = "";
   await resetDatabase(prisma());
@@ -71,6 +74,8 @@ describe("deleteEverything (E10-8)", () => {
     // A posting pasted for Claude chat, and the connector, which goes off (#221).
     await prisma().claudePaste.create({ data: { text: "A posting", expiresAt: new Date(Date.now() + 60_000) } });
     await prisma().setting.create({ data: { key: "connectorEnabledAt", value: "2026-10-23T09:00:00.000Z" } });
+    await prisma().markdownProfile.create({ data: { id: "custom-format", config: defaultProfile } });
+    await prisma().resumeSource.create({ data: { id: "private-source", path: "about/private.en.md", language: "en", collection: "about", contentHash: "synthetic-hash", content: { body: "Synthetic career snapshot" } } });
     await expect(deleteEverything({ confirm: "DELETE" })).rejects.toThrow("NEXT_REDIRECT");
     expect(redirected.to).toBe("/");
     const counts = await Promise.all([
@@ -91,8 +96,13 @@ describe("deleteEverything (E10-8)", () => {
       prisma().setting.count(),
       prisma().job.count(),
       prisma().theme.count({ where: { builtIn: false } }),
+      prisma().markdownLink.count(),
+      prisma().markdownDocument.count(),
+      prisma().markdownProfile.count(),
+      prisma().markdownWork.count(),
+      prisma().resumeSource.count(),
     ]);
-    expect(counts).toEqual([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(counts).toEqual(Array(22).fill(0));
     expect(await prisma().theme.count({ where: { builtIn: true } })).toBe(12);
     expect(await readdir(dataDir.path)).toEqual([]);
   });

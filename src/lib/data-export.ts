@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { profileSchema } from "@/lib/markdown/profile";
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
   AgentCandidateStatus,
@@ -194,6 +195,10 @@ const application = z.object({
   mode: text,
   salary: text,
   deadline: optionalDate,
+  applicationDate: optionalDate.optional(),
+  followUpDate: optionalDate.optional(),
+  nextAction: text.optional(),
+  aiProvenance: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
   postingUrl: text,
   postingText: text,
   extracted: z.unknown().nullable(),
@@ -318,7 +323,17 @@ const postingSearch = z.object({
 });
 
 /** An export file as read back (E10-6). */
+const relativePath = text.refine((s) => !!s && !s.startsWith("/") && !s.includes("\\") && !s.split("/").some((part) => ["", ".", ".."].includes(part)), "Integration paths must be relative and remain within runtime roots.");
+const markdownExport = z.object({
+  profiles: z.array(z.object({ id: text, config: profileSchema, draft: profileSchema.nullable(), paused: z.boolean(), updatedAt: date })),
+  links: z.array(z.object({ applicationId: text, profileId: text, path: relativePath, noteId: text, snapshot: z.unknown(), contentHash: text, state: text, error: text.nullable(), conflict: z.unknown().nullable(), updatedAt: date })),
+  documents: z.array(z.object({ documentId: text, path: relativePath, snapshot: z.unknown(), contentHash: text, conflict: z.unknown().nullable(), error: text.nullable(), updatedAt: date })),
+  work: z.array(z.object({ applicationId: text, revision: int, attempts: int, error: text.nullable(), updatedAt: date })),
+  resumeSources: z.array(z.object({ id: text, path: relativePath, language: text, collection: text, contentHash: text, content: z.unknown(), targetId: text.nullable(), updatedAt: date })),
+});
+
 export const exportSchema = z.object({
+  markdown: markdownExport.optional(),
   format: z.literal(EXPORT_FORMAT),
   schemaVersion: z.literal([1, 2, 3, 4, 5, 6]),
   appVersion: text,
@@ -374,7 +389,7 @@ export async function buildExport(
   { includeApiKey = false, now = new Date() }: { includeApiKey?: boolean; now?: Date } = {},
 ): Promise<DossierExport> {
   return db.$transaction(async (tx) => {
-    const [fields, skills, languages, experience, projects, education, publications, references, facts, themes, settings, applications, postings, searches, agentCandidates, startups, startupBlocks] = await Promise.all([
+    const [fields, skills, languages, experience, projects, education, publications, references, facts, themes, settings, applications, postings, searches, agentCandidates, startups, startupBlocks, markdownProfiles, markdownLinks, markdownDocuments, markdownWork, resumeSources] = await Promise.all([
       tx.profileField.findMany({ select: { key: true, value: true }, orderBy: { key: "asc" } }),
       tx.skill.findMany({ select: { id: true, name: true, sort: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
       tx.language.findMany({ select: { id: true, name: true, level: true, sort: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
@@ -407,6 +422,7 @@ export async function buildExport(
       tx.agentCandidate.findMany({ orderBy: { createdAt: "asc" } }),
       tx.startup.findMany({ orderBy: { createdAt: "asc" } }),
       tx.startupBlock.findMany({ orderBy: { createdAt: "asc" } }),
+      tx.markdownProfile.findMany(), tx.markdownLink.findMany(), tx.markdownDocument.findMany(), tx.markdownWork.findMany(), tx.resumeSource.findMany(),
     ]);
 
     // Keys only when asked for, decrypted; one that's unreadable here too (DOSSIER_SECRET changed) has nothing to export.
@@ -446,12 +462,13 @@ export async function buildExport(
       settings: settings.filter((setting) => !SECRET_SETTINGS.includes(setting.key) && !INSTALL_SETTINGS.includes(setting.key)),
       ...(apiKey ? { apiKey } : {}),
       ...(Object.keys(jobSourceKeys).length > 0 ? { jobSourceKeys } : {}),
-      applications,
+      applications: applications.map((item) => ({ ...item, aiProvenance: application.shape.aiProvenance.parse(item.aiProvenance) })),
       postings,
       searches,
       agentCandidates,
       startups,
       startupBlocks,
+      markdown: { profiles: markdownProfiles.map((p) => ({ ...p, config: profileSchema.parse(p.config), draft: p.draft ? profileSchema.parse(p.draft) : null })), links: markdownLinks, documents: markdownDocuments, work: markdownWork, resumeSources },
     };
   });
 }

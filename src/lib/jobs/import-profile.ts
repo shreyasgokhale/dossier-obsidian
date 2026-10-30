@@ -18,6 +18,7 @@ import { cancelJob, defineJob } from "./runner";
  * replaces with it, and the job, with the resume's text, is deleted then.
  */
 export const importProfileJob = defineJob({
+  captureSource: true,
   type: "import-profile",
   input: z.object({ resume: z.string().trim().min(1).max(MAX_RESUME_CHARACTERS) }),
   result: z.object({ profile: importedProfileSchema, readWith: z.string() }),

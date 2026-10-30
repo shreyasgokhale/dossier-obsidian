@@ -22,6 +22,9 @@ import { loadSettings } from "@/lib/settings-data";
 import { availableUpdate } from "@/lib/update-check";
 import { USAGE_PING_HOST, usagePingChoice } from "@/lib/usage-ping";
 
+import { integrationView } from "@/lib/markdown/service";
+import { MarkdownSection } from "./markdown-section";
+
 import { AgentSection } from "./agent-section";
 import { AiBehaviour } from "./ai-behaviour";
 import { AiProviderSection } from "./ai-provider-section";
@@ -45,7 +48,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
   return (
     <SettingsScreen section={section}>
-      {section === "ai" ? (
+      {section === "markdown" ? (<MarkdownSection initial={await integrationView()} />) : section === "ai" ? (
         <>
           <AiProviderSection initial={await loadAiSettingsView()} />
           <AiBehaviour initial={{ creativity: settings.creativity, strict: settings.strict, showDiff: settings.showDiff }} />

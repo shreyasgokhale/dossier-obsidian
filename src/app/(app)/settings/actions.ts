@@ -1,5 +1,7 @@
 "use server";
 
+import { rm } from "node:fs/promises";
+import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -239,6 +241,7 @@ export const deleteEverything = action(z.object({ confirm: z.literal("DELETE") }
   await disconnectGoogle().catch(() => {});
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(13824671)::text`;
     await tx.job.deleteMany();
     // Find jobs' postings and past searches (E14-9, E14-10).
     await tx.posting.deleteMany();
@@ -255,6 +258,10 @@ export const deleteEverything = action(z.object({ confirm: z.literal("DELETE") }
     await tx.emailMessage.deleteMany();
     // Applications take their history, documents, chat and notes along.
     await tx.application.deleteMany();
+    await tx.markdownProfile.deleteMany();
+    await tx.resumeSource.deleteMany();
+    // Application cascades enqueue work; clear it after deleting the records.
+    await tx.markdownWork.deleteMany();
     await tx.experience.deleteMany();
     await tx.project.deleteMany();
     await tx.skill.deleteMany();
@@ -269,7 +276,10 @@ export const deleteEverything = action(z.object({ confirm: z.literal("DELETE") }
   });
   // An empty profile and default settings need no rows; the built-in themes do.
   await seedBuiltIns(prisma);
-  await Promise.all([deleteAllBackups(), deleteAllDownloads()]);
+  await Promise.all([
+    deleteAllBackups(), deleteAllDownloads(),
+    rm(path.join(env.DOSSIER_DATA_DIR, "markdown-recovery"), { recursive: true, force: true }),
+  ]);
 
   revalidatePath("/", "layout");
   redirect("/");

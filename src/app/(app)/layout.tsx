@@ -15,6 +15,9 @@ import { appVersion } from "@/lib/version";
 import { Sidebar } from "./sidebar";
 import { UsagePingDialog } from "./usage-ping-dialog";
 
+// Protected pages read runtime data and must never query a database during image builds.
+export const dynamic = "force-dynamic";
+
 /**
  * The signed-in shell: sidebar on the left, the screen on the right. Routes
  * outside the (app) group, such as /login, render without it. Every page

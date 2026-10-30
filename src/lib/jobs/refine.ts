@@ -30,6 +30,7 @@ const listOf = (names: string[]) => (names.length <= 1 ? names.join("") : `${nam
  * saw it; the reply mentions any it left alone.
  */
 export const refineJob = defineJob({
+  captureSource: true,
   type: "refine",
   input: z.object({
     applicationId: z.string().min(1),

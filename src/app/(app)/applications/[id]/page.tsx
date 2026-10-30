@@ -18,6 +18,7 @@ import { refineSuggestions } from "@/lib/refine-suggestions";
 import { loadThemes } from "@/lib/theme-data";
 import { userTimeZone } from "@/lib/time-zone";
 
+import { TrackingFields } from "./tracking-fields";
 import { ApplicationView } from "./application-view";
 import { metaLine } from "./meta";
 import { tabFrom } from "./tabs";
@@ -79,6 +80,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
 
   return (
     <ApplicationView
+      tracking={<TrackingFields id={id} initial={{ applicationDate: application.applicationDate?.toISOString().slice(0, 10) ?? "", followUpDate: application.followUpDate?.toISOString().slice(0, 10) ?? "", deadline: application.deadline?.toISOString().slice(0, 10) ?? "", nextAction: application.nextAction, company: application.company, role: application.role, postingUrl: application.postingUrl, location: application.location }} />}
       application={{
         id,
         title,

@@ -21,6 +21,7 @@ export const scoreJobKey = (posting: Pick<FoundPosting, "source" | "externalId">
  * of it is asked for the rest first. The score is kept with the posting.
  */
 export const scorePostingJob = defineJob({
+  captureSource: true,
   type: "posting-score",
   input: z.object({ posting: foundPostingSchema }),
   result: z.object({ score: z.number().int(), reasons: z.array(z.string()), redFlags: z.array(z.string()) }),

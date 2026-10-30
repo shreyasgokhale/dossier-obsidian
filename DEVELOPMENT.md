@@ -1,6 +1,9 @@
 # Developing Dossier
 
-Next.js 16 (App Router) + Prisma 7 + PostgreSQL 18, run with Docker Compose and Yarn 4. Nothing runs on the host: every command goes through the containers. For installing and running Dossier, see the [README](README.md); for how it's secured, [SECURITY.md](SECURITY.md).
+For this fork's synthetic demo, native setup, Markdown integration checks, runtime
+mounts and maintenance, see [the Markdown runbook](docs/markdown-runbook.md).
+
+The upstream container workflow below uses Next.js 16 (App Router) + Prisma 7 + PostgreSQL 18 with Docker Compose and Yarn 4. Every command in that workflow goes through the containers. For installing and running Dossier, see the [README](README.md); for how it's secured, [SECURITY.md](SECURITY.md).
 
 ## Getting started
 

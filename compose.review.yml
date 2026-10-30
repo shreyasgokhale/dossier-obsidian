@@ -1,0 +1,146 @@
+# Synthetic review only. No bind mounts, host network or inherited .env files.
+name: dossier-isolated-review
+x-workload: &workload
+  image: dossier-isolated-review:local
+  user: "1000:1000"
+  init: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  network_mode: service:gate
+  shm_size: 256mb
+  environment: &test-env
+    DATABASE_URL: postgresql://postgres:synthetic-review@127.0.0.1:5432/dossier_review
+    CI: "1"
+    NEXT_TELEMETRY_DISABLED: "1"
+    COREPACK_ENABLE_NETWORK: "0"
+    DOSSIER_SCREENSHOT_DIR: /review/reports/markdown/screenshots
+  volumes:
+    - runtime:/review
+services:
+  gate:
+    image: dossier-isolated-review:local
+    user: "0:0"
+    entrypoint: [bash, /app/docker/review/gate.sh]
+    cap_drop: [ALL]
+    # Only the trusted network bootstrap has these, then drops every capability.
+    cap_add: [NET_ADMIN, SETUID, SETGID, SETPCAP]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    tmpfs: [/tmp]
+    ports: ["127.0.0.1:3200:3000"]
+    networks: [isolated]
+    healthcheck:
+      test: [CMD, test, -f, /tmp/firewall-ready]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+  init:
+    image: dossier-isolated-review:local
+    user: "0:0"
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - postgres:/pg
+      - runtime:/review
+    command: [bash, /app/docker/review/init.sh]
+  db:
+    image: postgres:18.6-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
+    user: "70:70"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    network_mode: service:gate
+    read_only: true
+    tmpfs: [/tmp, "/var/run/postgresql:uid=70,gid=70,mode=3775"]
+    depends_on:
+      gate: {condition: service_healthy}
+      init: {condition: service_completed_successfully}
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: synthetic-review
+      POSTGRES_DB: dossier_review
+      PGDATA: /var/lib/postgresql/18/docker
+    volumes: ["postgres:/var/lib/postgresql"]
+    command: [postgres, -c, listen_addresses=127.0.0.1]
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, postgres, -d, dossier_review]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  checks:
+    <<: *workload
+    profiles: [checks]
+    depends_on:
+      db: {condition: service_healthy}
+    command: [sleep, infinity]
+  demo-seed:
+    <<: *workload
+    profiles: [demo]
+    depends_on:
+      db: {condition: service_healthy}
+    command: [yarn, tsx, docker/review/seed.mts]
+  fakes:
+    <<: *workload
+    profiles: [demo]
+    depends_on:
+      gate: {condition: service_healthy}
+    command: [bash, /app/docker/review/fakes.sh]
+    healthcheck:
+      test: [CMD, node, -e, "Promise.all([3999,3998,3997].map(p=>fetch('http://127.0.0.1:'+p+'/health').then(r=>{if(!r.ok)throw Error(p)}))).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  demo:
+    profiles: [demo]
+    image: dossier-isolated-demo:local
+    user: "1000:1000"
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    network_mode: service:gate
+    read_only: true
+    shm_size: 256mb
+    tmpfs:
+      - /tmp:uid=1000,gid=1000,mode=1777
+      - /app/.next/cache:uid=1000,gid=1000
+    depends_on:
+      demo-seed: {condition: service_completed_successfully}
+      fakes: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql://postgres:synthetic-review@127.0.0.1:5432/dossier_markdown_e2e
+      DOSSIER_PASSWORD: "argon2id:m=19456,t=2,p=1:wk-0a22NLDwpNVDMxLY9rw:x4bAXEh9EtlaTIqLiHwF_omyDOpcPtwPrV0_SJx_y2c"
+      DOSSIER_SECRET: isolated-synthetic-review-secret-2026
+      DOSSIER_PUBLIC_URL: http://localhost:3200
+      DOSSIER_DATA_DIR: /review/demo/data
+      DOSSIER_NOTES_ROOT: /review/demo/notes
+      DOSSIER_RESUME_ROOT: /review/demo/resume
+      DOSSIER_AI_PROVIDER: openai
+      DOSSIER_AI_URL: http://127.0.0.1:3999/v1
+      DOSSIER_AI_MODEL: fake-model
+      DOSSIER_AI_KEY: synthetic-review-key
+      DOSSIER_JOBS_SOURCE: "off"
+      DOSSIER_TELEMETRY: "off"
+      DOSSIER_UPDATES_TEST_BASE_URL: http://127.0.0.1:3998/github
+    volumes:
+      - type: volume
+        source: runtime
+        target: /review/demo/notes
+        volume: {subpath: demo/notes}
+      - type: volume
+        source: runtime
+        target: /review/demo/resume
+        read_only: true
+        volume: {subpath: demo/resume}
+      - type: volume
+        source: runtime
+        target: /review/demo/data
+        volume: {subpath: demo/data}
+networks:
+  isolated:
+    # A bridge is required for localhost publishing. The namespace firewall
+    # denies every new non-loopback outbound connection on both IP families.
+    driver: bridge
+volumes:
+  postgres:
+  runtime:

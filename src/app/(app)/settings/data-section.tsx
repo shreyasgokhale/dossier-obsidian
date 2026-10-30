@@ -344,6 +344,7 @@ function DangerZone() {
         <p className="text-control text-muted">
           Removes your profile, all applications and documents, your settings and the backups from this server. This can&apos;t be
           undone, so export first if you might want it back.
+          {" "}External Markdown notes and resume source files are kept.
         </p>
       </div>
       {confirming ? (

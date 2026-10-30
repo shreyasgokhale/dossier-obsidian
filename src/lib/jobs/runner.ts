@@ -7,6 +7,8 @@ import { JobStatus } from "@/generated/prisma/enums";
 import { loadAiConfig } from "@/lib/ai/config";
 import { AiError } from "@/lib/ai/errors";
 import { providerOption } from "@/lib/ai/provider-options";
+import { jobSourceContext } from "./source-context";
+import { loadProfile } from "@/lib/profile-data";
 import { logServerError } from "@/lib/log";
 import { prisma } from "@/lib/prisma";
 
@@ -27,6 +29,8 @@ export type JobContext = {
 
 export type JobDefinition<I, R> = {
   type: string;
+  /** Capture provider and profile once for AI attempts. */
+  captureSource?: boolean;
   input: z.ZodType<I>;
   result: z.ZodType<R>;
   /**
@@ -133,7 +137,7 @@ export async function startJob<I, R>(
 export async function retryJob(id: string): Promise<boolean> {
   const { count } = await prisma.job.updateMany({
     where: { id, status: JobStatus.FAILED },
-    data: { status: JobStatus.QUEUED, step: null, error: null, result: Prisma.DbNull, startedAt: null, finishedAt: null },
+    data: { status: JobStatus.QUEUED, step: null, error: null, startedAt: null, finishedAt: null },
   });
   if (count === 0) return false;
   await notify(id);
@@ -222,18 +226,27 @@ async function pump(): Promise<void> {
 
 async function execute(id: string, controller: AbortController): Promise<void> {
   try {
-    const job = await prisma.job.update({
+    const job = await prisma.job.findUnique({
       where: { id },
-      data: { status: JobStatus.RUNNING, startedAt: new Date() },
-      select: { type: true, input: true },
+      select: { type: true, input: true, provenance: true, result: true },
     });
-    await notify(id);
+    if (!job) return;
     // Job types register when their module loads; make sure they all have.
-    await import("./definitions");
+    if (!state.definitions.has(job.type)) await import("./definitions");
     const definition = state.definitions.get(job.type);
     if (!definition) throw new Error(`No job type "${job.type}" is defined.`);
 
-    const result = await definition.run(definition.input.parse(job.input), {
+    if (job.result !== null) {
+      await finish(id, { status: JobStatus.DONE, result: definition.result.parse(job.result) as Prisma.InputJsonValue });
+      return;
+    }
+    const source = definition.captureSource ? await Promise.all([loadAiConfig(), loadProfile()]) : null;
+    const config = source?.[0], profile = source?.[1];
+    const provenance = Array.isArray(job.provenance) ? job.provenance : [];
+    const captured = await prisma.job.updateMany({ where: { id }, data: { status: JobStatus.RUNNING, startedAt: new Date(), ...(config && profile ? { provenance: JSON.parse(JSON.stringify([...provenance, { at: new Date().toISOString(), provider: config.provider, model: config.model, sourceProfile: profile }])) } : {}) } });
+    if (captured.count === 0) return;
+    await notify(id);
+    const invoke = () => definition.run(definition.input.parse(job.input), {
       id,
       signal: controller.signal,
       step: async (name) => {
@@ -243,6 +256,7 @@ async function execute(id: string, controller: AbortController): Promise<void> {
         else await notify(id);
       },
     });
+    const result = config && profile ? await jobSourceContext.run({ config, profile, jobId: id, type: job.type }, invoke) : await invoke();
     await finish(id, { status: JobStatus.DONE, result: definition.result.parse(result) as Prisma.InputJsonValue });
   } catch (error) {
     // AI failures already say what to do; anything else is logged and kept vague.

@@ -21,7 +21,9 @@ Dossier keeps your career history in one profile and turns it into a clean resum
 
 It's for one person on a small server: one password, your data in your own PostgreSQL database, and an AI model of your choice. That can be a local model through Ollama or LM Studio, so your profile and documents stay on your own hardware, or a hosted one (any OpenAI-compatible API, Anthropic or Mistral), which then receives what it writes from. [Privacy](https://github.com/AienTech/dossier/wiki/Privacy) says what goes where.
 
-**Get started:** [run it on your computer](#run-it-on-your-computer) in a few minutes, or [self-host it](#self-hosting) on a server. The [installation guide](https://github.com/AienTech/dossier/wiki) covers every way: Docker with or without Compose, Node.js, a plain Ubuntu server, CapRover, Coolify and Dokploy.
+**Markdown fork:** this checkout adds configurable Markdown formats, adoption of existing notes, bidirectional editing, Obsidian exports and deterministic career imports. Start with the [fork runbook](docs/markdown-runbook.md) for the isolated fake-AI demo, native setup and tested-image deployment. See the [specification](docs/implementation-spec.md) and [implementation evidence and limitations](docs/implementation-status.md). Build this fork's image to use these features; upstream images do not contain them.
+
+**Upstream get started:** [run it on your computer](#run-it-on-your-computer) in a few minutes, or [self-host it](#self-hosting) on a server. The [installation guide](https://github.com/AienTech/dossier/wiki) covers every way: Docker with or without Compose, Node.js, a plain Ubuntu server, CapRover, Coolify and Dokploy.
 
 ## Demo
 

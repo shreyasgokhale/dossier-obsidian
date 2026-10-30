@@ -12,8 +12,8 @@ import { route } from "@/lib/route";
 /** The documents an application can download, by their `doc=` value. */
 const TAILORED = { resume: DocumentKind.RESUME, letter: DocumentKind.COVER_LETTER } as const;
 
-/** Application ids are cuids; anything else never reaches a print path. */
-const APPLICATION_ID = /^[a-z0-9]{1,64}$/i;
+/** Accept native cuids and adopted Markdown ids, without path separators. */
+const APPLICATION_ID = /^[a-z0-9_-]{1,100}$/i;
 
 const notFound = (error: string) => NextResponse.json({ error }, { status: 404 });
 

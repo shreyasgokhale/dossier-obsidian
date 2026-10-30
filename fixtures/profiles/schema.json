@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "representation": {
+      "type": "string",
+      "enum": [
+        "frontmatter",
+        "labels"
+      ]
+    },
+    "selection": {
+      "type": "object",
+      "properties": {
+        "include": {
+          "minItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        }
+      },
+      "required": [
+        "include",
+        "exclude"
+      ],
+      "additionalProperties": false
+    },
+    "fields": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "company",
+          "role",
+          "status",
+          "applicationDate",
+          "postingUrl",
+          "location",
+          "deadline",
+          "nextAction",
+          "followUpDate",
+          "nextInterviewAt"
+        ]
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      }
+    },
+    "idProperty": {
+      "default": "dossier_id",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100,
+      "pattern": "^[\\p{L}\\p{N}_ .-]+$"
+    },
+    "metadataHeading": {
+      "default": "Application",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "statusAliases": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "string",
+        "enum": [
+          "DRAFT",
+          "SENT",
+          "SCREENING",
+          "INTERVIEW",
+          "OFFER",
+          "ACCEPTED",
+          "REJECTED",
+          "DECLINED"
+        ]
+      }
+    },
+    "dateFormat": {
+      "type": "string",
+      "enum": [
+        "YYYY-MM-DD",
+        "DD.MM.YYYY",
+        "MM/DD/YYYY"
+      ]
+    },
+    "template": {
+      "type": "string",
+      "maxLength": 100000
+    },
+    "postingHeading": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "interviewHeading": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    }
+  },
+  "required": [
+    "version",
+    "name",
+    "representation",
+    "selection",
+    "fields",
+    "idProperty",
+    "metadataHeading",
+    "statusAliases",
+    "dateFormat",
+    "template"
+  ],
+  "additionalProperties": false
+}

@@ -66,6 +66,7 @@ function omit<T extends object, K extends keyof T>(value: T, ...keys: K[]): Omit
   return Object.fromEntries(Object.entries(value).filter(([key]) => !keys.includes(key as K))) as Omit<T, K>;
 }
 
+const requiredJson = (value: unknown) => value === null || value === undefined ? Prisma.JsonNull : value as Prisma.InputJsonValue;
 const json = (value: unknown) => (value === null || value === undefined ? Prisma.DbNull : (value as Prisma.InputJsonValue));
 /** A JSON list for a column that can't be null (#222): anything else reads as empty. */
 const jsonList = (value: unknown) => (Array.isArray(value) ? value : []) as Prisma.InputJsonValue;
@@ -89,6 +90,12 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
       // Out with the old. Applications take their history, documents, chat,
       // notes and jobs along; the other jobs (a resume import, postings read
       // for applications never created) hold the old data too.
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(13824671)::text`;
+      await tx.markdownLink.deleteMany();
+      await tx.markdownDocument.deleteMany();
+      await tx.markdownProfile.deleteMany();
+      await tx.resumeSource.deleteMany();
+      await tx.markdownWork.deleteMany();
       await tx.job.deleteMany();
       await tx.posting.deleteMany();
       await tx.postingSearch.deleteMany();
@@ -142,6 +149,7 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
           ...omit(application, "events", "documents", "messages", "notes", "facts", "userNote"),
           extracted: json(application.extracted),
           match: json(application.match),
+          aiProvenance: json(application.aiProvenance),
         })),
       });
       await tx.statusEvent.createMany({
@@ -183,6 +191,20 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
           ...application.facts,
         ].map((fact) => ({ ...fact, applicationId: application.id }))),
       });
+      if (data.markdown) {
+        const md = data.markdown;
+        const applicationIds = new Set(applications.map((a) => a.id));
+        for (const link of md.links) {
+          const owner = applications.find((a) => a.id === link.applicationId);
+          if (!owner?.notes.some((n) => n.id === link.noteId) || !md.profiles.some((p) => p.id === link.profileId)) throw new Error("Invalid Markdown application/note/profile mapping in export.");
+        }
+        await tx.markdownProfile.createMany({ data: md.profiles.map((p) => ({ ...p, config: p.config as Prisma.InputJsonValue, draft: json(p.draft) })) });
+        await tx.markdownLink.createMany({ data: md.links.map((l) => ({ ...l, snapshot: requiredJson(l.snapshot), conflict: json(l.conflict) })) });
+        await tx.markdownDocument.createMany({ data: md.documents.map((d) => ({ ...d, snapshot: requiredJson(d.snapshot), conflict: json(d.conflict) })) });
+        await tx.resumeSource.createMany({ data: md.resumeSources.map((s) => ({ ...s, content: requiredJson(s.content) })) });
+        // Import triggers queue a reconciliation; saved work replaces matching rows.
+        for (const work of md.work.filter((w) => applicationIds.has(w.applicationId))) await tx.markdownWork.upsert({ where: { applicationId: work.applicationId }, create: work, update: work });
+      }
       // A posting's application that isn't in the file leaves it unlinked.
       const applicationIds = new Set(applications.map((application) => application.id));
       await tx.posting.createMany({

@@ -23,6 +23,7 @@ export const unitJobKey = (applicationId: string) => `units:${applicationId}`;
  * when the rewrite started, so an edit made meanwhile wins.
  */
 export const regenerateUnitJob = defineJob({
+  captureSource: true,
   type: "regenerate-unit",
   input: z.object({
     applicationId: z.string().min(1),

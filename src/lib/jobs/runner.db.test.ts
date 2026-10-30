@@ -18,6 +18,24 @@ vi.spyOn(console, "error").mockImplementation(() => {});
 
 const prisma = () => db.client!;
 
+it("preserves each draft attempt after job retention, including late application links", async () => {
+  const application = await prisma().application.create({ data: {} });
+  const first = { provider: "LOCAL", model: "synthetic-model", sourceProfile: { basics: { name: "Original candidate" } } };
+  const job = await prisma().job.create({ data: { type: "write-documents", status: "DONE", input: {}, provenance: [first] } });
+  await prisma().job.update({ where: { id: job.id }, data: { applicationId: application.id } });
+  await prisma().job.update({ where: { id: job.id }, data: { provenance: [first] } });
+  let saved = (await prisma().application.findUniqueOrThrow({ where: { id: application.id } })).aiProvenance;
+  expect(saved).toEqual([{ ...first, jobId: job.id, type: "write-documents", attempt: 1 }]);
+  const second = { ...first, model: "retried-model" };
+  await prisma().job.update({ where: { id: job.id }, data: { provenance: [first, second] } });
+  await prisma().job.delete({ where: { id: job.id } });
+  saved = (await prisma().application.findUniqueOrThrow({ where: { id: application.id } })).aiProvenance;
+  expect(saved).toEqual([
+    { ...first, jobId: job.id, type: "write-documents", attempt: 1 },
+    { ...second, jobId: job.id, type: "write-documents", attempt: 2 },
+  ]);
+});
+
 /** Waits until `check` passes, for work that runs in the background. */
 async function eventually(check: () => Promise<void>, timeout = 3000) {
   const started = Date.now();
@@ -168,6 +186,14 @@ describe("the job runner", () => {
     });
   });
 
+  it("completes a committed checkpoint after restart without rerunning its mutation", async () => {
+    const row = await prisma().job.create({ data: { type: "test-gated", status: "RUNNING", input: { name: "checkpoint-restart", fail: "no" }, result: { greeting: "Already committed" } } });
+    await recoverInterruptedJobs();
+    expect(await retryJob(row.id)).toBe(true);
+    await eventually(async () => expect(await getJob(row.id)).toMatchObject({ status: "DONE", result: { greeting: "Already committed" } }));
+    expect(gates.has("checkpoint-restart")).toBe(false);
+  });
+
   it("marks jobs a previous process left unfinished as failed, so they can be retried", async () => {
     await prisma().job.createMany({
       data: [
@@ -179,4 +205,26 @@ describe("the job runner", () => {
     expect(await recoverInterruptedJobs()).toBe(2);
     expect(await prisma().job.count({ where: { status: "FAILED", error: "Dossier restarted before this finished. Try again." } })).toBe(2);
   });
+});
+
+it("records and uses one source profile snapshot for an AI attempt", async () => {
+  await prisma().profileField.create({ data: { key: "name", value: "Original candidate" } });
+  const sourceJob = defineJob({
+    type: "test-captured-source",
+    captureSource: true,
+    input: z.object({}),
+    result: z.object({ name: z.string() }),
+    async run(_input, { step }) {
+      await step("Source captured");
+      await new Promise<void>((resolve) => gates.set("captured-source", resolve));
+      const { loadProfile } = await import("@/lib/profile-data");
+      return { name: (await loadProfile()).basics.name };
+    },
+  });
+  const id = await startJob(sourceJob, {});
+  await eventually(async () => expect(await getJob(id)).toMatchObject({ status: "RUNNING", step: "Source captured" }));
+  await prisma().profileField.update({ where: { key: "name" }, data: { value: "Changed during generation" } });
+  await release("captured-source");
+  await eventually(async () => expect(await getJob(id)).toMatchObject({ status: "DONE", result: { name: "Original candidate" } }));
+  expect((await prisma().job.findUniqueOrThrow({ where: { id } })).provenance).toEqual([expect.objectContaining({ provider: "LOCAL", sourceProfile: expect.objectContaining({ basics: expect.objectContaining({ name: "Original candidate" }) }) })]);
 });

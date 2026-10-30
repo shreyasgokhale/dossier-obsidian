@@ -32,6 +32,8 @@ type Unit = { id: string; label: string; text: string };
 let emails = 0;
 /** The last request's messages, for specs that check what a prompt carried (GET /last). */
 let last: Message[] = [];
+let failures = 0;
+let delayMs = 300;
 
 const answers: Record<string, (messages: Message[]) => unknown> = {
   extracted_posting: () => ({
@@ -207,6 +209,12 @@ createServer((request, response) => {
     response.end(JSON.stringify(body));
   };
   if (request.method === "GET" && request.url === "/health") return send(200, { ok: true });
+  if (request.method === "POST" && request.url === "/test/control") {
+    let raw = "";
+    request.on("data", (chunk) => raw += chunk);
+    request.on("end", () => { const value = JSON.parse(raw); failures = Math.max(0, Number(value.failures ?? 0)); delayMs = Math.max(0, Number(value.delayMs ?? 300)); send(200, { failures, delayMs }); });
+    return;
+  }
   if (request.method === "GET" && request.url === "/last") return send(200, { messages: last });
   if (request.method === "GET" && request.url === "/v1/models") {
     return send(200, { object: "list", data: [{ id: "fake-model", object: "model", created: 0, owned_by: "e2e" }] });
@@ -220,7 +228,8 @@ createServer((request, response) => {
     last = body.messages;
     const name = body.response_format?.json_schema?.name;
     const answer = name && answers[name];
-    if (!answer) return send(400, { error: { message: `No fake answer for "${name}".` } });
+    if (failures > 0) { failures--; return send(503, { error: { message: "Synthetic recoverable provider failure" } }); }
+    if (!answer && name) return send(400, { error: { message: `No fake answer for "${name}".` } });
     // A moment of "thinking", so progress shows as it would.
     setTimeout(() => {
       try {
@@ -229,12 +238,12 @@ createServer((request, response) => {
           object: "chat.completion",
           created: Math.floor(Date.now() / 1000),
           model: "fake-model",
-          choices: [{ index: 0, message: { role: "assistant", content: JSON.stringify(answer(body.messages)) }, finish_reason: "stop" }],
+          choices: [{ index: 0, message: { role: "assistant", content: answer ? JSON.stringify(answer(body.messages)) : "The sky is blue." }, finish_reason: "stop" }],
           usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
         });
       } catch (error) {
         send(500, { error: { message: String(error) } });
       }
-    }, 300);
+    }, delayMs);
   });
 }).listen(port, () => console.log(`Fake AI server on http://localhost:${port}`));

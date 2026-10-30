@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "dependencies": {
+    "prisma": "7.10.0",
+    "dotenv": "18.0.4"
+  },
+  "overrides": {
+    "mysql2": "3.24.4"
+  },
+  "allowScripts": {
+    "prisma": true,
+    "@prisma/engines": true
+  }
+}

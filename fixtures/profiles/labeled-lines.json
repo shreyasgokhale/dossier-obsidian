@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "name": "Labeled lines",
+  "representation": "labels",
+  "selection": {
+    "include": [
+      "**/*.md"
+    ],
+    "exclude": [
+      "Dossier/**"
+    ]
+  },
+  "fields": {
+    "company": "Company:",
+    "role": "Role:",
+    "status": "Status:",
+    "applicationDate": "Applied:",
+    "postingUrl": "URL:",
+    "location": "Location:",
+    "deadline": "Deadline:",
+    "nextAction": "Next action:",
+    "followUpDate": "Follow-up:",
+    "nextInterviewAt": "Interview at:"
+  },
+  "idProperty": "dossier_id",
+  "metadataHeading": "Application",
+  "statusAliases": {
+    "draft": "DRAFT",
+    "Draft": "DRAFT",
+    "sent": "SENT",
+    "Sent": "SENT",
+    "screening": "SCREENING",
+    "Screening": "SCREENING",
+    "interview": "INTERVIEW",
+    "Interview": "INTERVIEW",
+    "offer": "OFFER",
+    "Offer": "OFFER",
+    "accepted": "ACCEPTED",
+    "Accepted": "ACCEPTED",
+    "rejected": "REJECTED",
+    "Rejected": "REJECTED",
+    "declined": "DECLINED",
+    "Declined": "DECLINED"
+  },
+  "dateFormat": "YYYY-MM-DD",
+  "template": "# Application\n\nCompany: {{company}}\nRole: {{role}}\nStatus: {{status}}\n\n# Interview\n\n"
+}

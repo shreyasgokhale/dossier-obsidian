@@ -1,0 +1,16 @@
+{
+  "peers": [
+    {
+      "type": "storage", "name": "dossier-notes", "group": "applications",
+      "baseDir": "/app/data/", "scanOfflineChanges": true, "useChokidar": true,
+      "ignore": ["**/.git/**", "**/.obsidian/**", "**/*.tmp", "**/.DS_Store"]
+    },
+    {
+      "type": "couchdb", "name": "dossier-couchdb", "group": "applications",
+      "database": "dossier-notes", "username": "REPLACE_USER", "password": "REPLACE_PASSWORD",
+      "url": "http://couchdb:5984", "baseDir": "Applications/",
+      "passphrase": "REPLACE_CONTENT_PASSPHRASE", "obfuscatePassphrase": "REPLACE_PATH_PASSPHRASE",
+      "useRemoteTweaks": true
+    }
+  ]
+}

@@ -351,7 +351,7 @@ describe("creating the application (E7-6)", () => {
     vi.mocked(createApplication).mockResolvedValue({ ok: true, data: "app-1" });
     render(<NewApplication {...props} fromPosting={{ id: "posting-1", text: "Ledgerly: Designer\n\nWe're hiring.", url: "https://jobs.example/1", complete: true }} />);
     await userEvent.click(screen.getByRole("button", { name: "Read the posting →" }));
-    expect(startReadingPosting).toHaveBeenCalledWith({ posting: "Ledgerly: Designer\n\nWe're hiring." });
+    expect(startReadingPosting).toHaveBeenCalledWith({ posting: "Ledgerly: Designer\n\nWe're hiring.", postingUrl: "https://jobs.example/1", postingId: "posting-1" });
     emit({ status: "DONE", result: read });
     await userEvent.click(screen.getByRole("button", { name: "Create application →" }));
     emit({ id: "job-2", type: "write-documents", status: "DONE", step: "Writing your cover letter" });

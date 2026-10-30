@@ -1,6 +1,7 @@
 import "server-only";
 
 import { photoFromFields } from "@/lib/photo";
+import { jobSourceContext } from "@/lib/jobs/source-context";
 import { prisma } from "@/lib/prisma";
 import { basicsFromFields, factTexts, inEntryOrder, type FactItem, type ProfileData } from "@/lib/profile";
 import { loadSettings } from "@/lib/settings-data";
@@ -17,6 +18,8 @@ export async function loadProfileName(): Promise<string> {
  * publications are always in the order set by hand (#218).
  */
 export async function loadProfile(): Promise<ProfileData> {
+  const captured = jobSourceContext.getStore();
+  if (captured) return structuredClone(captured.profile);
   const [fields, skills, languages, experience, projects, education, publications, references, facts, settings] = await Promise.all([
     prisma.profileField.findMany(),
     prisma.skill.findMany({ orderBy: [{ sort: "asc" }, { createdAt: "asc" }] }),

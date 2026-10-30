@@ -16,6 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { loadFactTexts, loadProfile } from "@/lib/profile-data";
 import { startupAddress } from "@/lib/startups/types";
 
+import { checkpointJob } from "./source-context";
 import { defineJob } from "./runner";
 
 /** The key of an application's email writing, to find it again after a reload. */
@@ -30,6 +31,7 @@ export const emailJobKey = (applicationId: string) => `email:${applicationId}`;
  * here: addresses never go to the AI.
  */
 export const writeEmailJob = defineJob({
+  captureSource: true,
   type: "write-email",
   input: z.object({ applicationId: z.string().min(1) }),
   result: z.object({
@@ -73,6 +75,7 @@ export const writeEmailJob = defineJob({
         await prisma.$transaction(async (tx) => {
           const document = await tx.document.create({ data: { applicationId, kind: DocumentKind.EMAIL, units: withTo(data), writtenWith: promptVersion } });
           await saveVersion(tx, document.id, withTo(data), { cause: VersionCause.WRITTEN });
+          await checkpointJob(tx, { units: withTo(data), previous: null });
         });
         return { units: withTo(data), previous: null };
       } catch (error) {
@@ -89,9 +92,8 @@ export const writeEmailJob = defineJob({
         documents[DocumentKind.EMAIL] = units;
         return { units, previous };
       },
-      { version: { cause: VersionCause.WRITTEN } },
+      { version: { cause: VersionCause.WRITTEN }, writtenWith: promptVersion },
     );
-    await prisma.document.updateMany({ where: { applicationId, kind: DocumentKind.EMAIL }, data: { writtenWith: promptVersion } });
     return written;
   },
 });

@@ -10,6 +10,9 @@ export async function register() {
     const { logServerError } = await import("@/lib/log");
     await recoverInterruptedJobs().catch((error: unknown) => logServerError("startup", error));
 
+    const { startMarkdownWorker } = await import("@/lib/markdown/worker");
+    startMarkdownWorker();
+
     // Finished jobs, with what they were given and wrote, are deleted after a while.
     const { startJobSweep } = await import("@/lib/jobs/retention");
     startJobSweep();
