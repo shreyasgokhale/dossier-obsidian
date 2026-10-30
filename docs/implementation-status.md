@@ -190,3 +190,18 @@ and record the result. After that, validate a restored disposable deployment on 
 user's Linux VM/HTTPS setup before any private-data migration. No merge or deployment
 has been performed. The branch and delivery artifacts preserve the implementation
 and all reviewable commits for that continuation.
+
+### PR #1 rebase onto Dossier 1.10.0 — 2026-10-30
+
+Rebased all 14 feature commits onto main at a1ab921. Conflict resolutions retain
+upstream dependency versions, Claude handoff, Startups, publications/profile photo,
+and export schema version 6, alongside Markdown integration and durable recovery.
+Settings navigation and reset tests cover both sets of features; the integration
+export assertion now expects version 6.
+
+Validation on the rebased branch: immutable Yarn install, Prisma generation,
+lint, typecheck, and production build pass. Full Vitest run with one worker:
+1,771 passed, 29 skipped (213 files passed, 4 skipped). Playwright against fake
+services and a separate dossier_e2e database: all 138 passed. Database tests used
+only dossier_test. No private vaults, external AI, merge, or deployment used.
+Next step: review and merge PR #1 after GitHub CI completes.

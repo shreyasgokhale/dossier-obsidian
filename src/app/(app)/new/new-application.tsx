@@ -132,8 +132,8 @@ function useLeaveGuard(active: boolean, onLeave: () => void) {
 }
 
 export type NewApplicationProps = {
-  /** Whether an AI provider is set up; without one, the page points to Settings. */
   recovered?: Draft | null;
+  /** Whether an AI provider is set up; without one, the page points to Settings. */
   aiReady: boolean;
   /** The Claude connector is on and Dossier has no usable AI model: a Claude chat writes it instead (#221). */
   writeInClaude?: boolean;
