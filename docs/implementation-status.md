@@ -309,8 +309,17 @@ nine, and there were zero automatic draft jobs. Screenshots are retained at
 `docs/screenshots/digest/daily-digest.png` and
 `docs/screenshots/digest/search-preferences.png`.
 
-Review the populated digest directly:
-<http://localhost:3200/digest?id=cmvvlqj13000166plpo3aem08>, password **demo-password**.
+The following URL is **cloud-workspace-local**, not accessible through a
+reviewer's computer's localhost:
+`http://localhost:3200/digest?id=cmvvlqj13000166plpo3aem08`, password **demo-password**.
+This environment exposes no browser port-forwarding capability. The original chat
+handoff incorrectly presented this as a directly usable review link. For
+interactive review on your own computer, obtain `feat/daily-job-digest` and follow
+the local setup commands in `docs/daily-job-digest.md`. The branch currently exists
+only in this workspace. Automatic approval review rejected an attempted GitHub
+review-branch push because publishing repository contents and screenshots requires
+explicit user permission. The rejected command did not execute. No push or app
+deployment occurred; publication remains pending approval.
 The query pins the populated initial digest even if a later scheduled scan finds
 no new jobs. The preview remains running locally on port 3200 with fake AI on
 3996 and fake job sources on 3995. Runtime: `/tmp/dossier-demo-TfHREk`;
