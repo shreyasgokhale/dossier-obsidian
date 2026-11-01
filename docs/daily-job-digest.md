@@ -72,13 +72,14 @@ All five new public service hosts returned proxy CONNECT 403 (HTTP 000) in this 
 preview. A server started in this cloud workspace is not accessible through your
 computer's localhost. This environment exposes no browser port-forwarding
 capability. No hosted preview has been deployed. For interactive review, run the
-preview on your own computer using the steps below. The feature branch currently
-exists only in the cloud workspace; publishing it to GitHub requires approval.
+preview on your own computer using the steps below. The feature branch is now
+available on GitHub as `feat/daily-job-digest`, published with user approval for
+source and screenshot review. The app has not been deployed.
 The [digest screenshot](screenshots/digest/daily-digest.png) and
 [Search Preferences screenshot](screenshots/digest/search-preferences.png) are
 included on the local feature branch.
 
-Once the feature branch has been published or transferred to your computer:
+Obtain the feature branch on your computer:
 
 ```bash
 git clone --branch feat/daily-job-digest https://github.com/shreyasgokhale/dossier-obsidian.git dossier-digest-review
@@ -86,8 +87,7 @@ cd dossier-digest-review
 ```
 
 For an existing checkout, fetch `origin`, switch to `feat/daily-job-digest`, and
-fast-forward from `origin/feat/daily-job-digest` instead. These GitHub commands
-require the review branch to have been pushed first.
+fast-forward from `origin/feat/daily-job-digest` instead.
 
 Use Node 24.19.0, Yarn 4.18.1 and a local PostgreSQL server accessible to `DEMO_DATABASE_SERVER` (defaults to `postgresql://postgres:postgres@127.0.0.1:5432/postgres`). The database role needs CREATE DATABASE for this isolated demo.
 

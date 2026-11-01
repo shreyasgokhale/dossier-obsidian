@@ -233,7 +233,9 @@ performed.
 
 The newest work is on `feat/daily-job-digest`, based on `main` after checkout and
 successful `git pull --ff-only` at `23b9062` (Feature/configurable markdown #1).
-Implementation commit: `07c762c`. No merge, push, publication or deployment was performed. The initial sandbox
+Implementation commit: `07c762c`. The initial implementation remained local; the
+feature branch was subsequently pushed to GitHub with user approval for review.
+No merge or app deployment was performed. The initial sandbox
 connection failure was resolved using the permitted execution path; pulling is
 not an outstanding blocker. AGENTS.md and the existing search/agent/profile,
 Markdown filesystem/merge worker, application and export workflows were inspected
@@ -315,11 +317,13 @@ reviewer's computer's localhost:
 This environment exposes no browser port-forwarding capability. The original chat
 handoff incorrectly presented this as a directly usable review link. For
 interactive review on your own computer, obtain `feat/daily-job-digest` and follow
-the local setup commands in `docs/daily-job-digest.md`. The branch currently exists
-only in this workspace. Automatic approval review rejected an attempted GitHub
-review-branch push because publishing repository contents and screenshots requires
-explicit user permission. The rejected command did not execute. No push or app
-deployment occurred; publication remains pending approval.
+the local setup commands in `docs/daily-job-digest.md`.
+An earlier review-branch push was blocked pending explicit publishing permission;
+that rejected command did not execute. On 1 November 2026, the user approved
+publishing the review branch. `feat/daily-job-digest` was then successfully pushed
+to `shreyasgokhale/dossier-obsidian`. The source and synthetic screenshots are
+available on GitHub; the app remains undeployed. Review the [feature branch](https://github.com/shreyasgokhale/dossier-obsidian/tree/feat/daily-job-digest)
+and [digest screenshot](https://github.com/shreyasgokhale/dossier-obsidian/blob/feat/daily-job-digest/docs/screenshots/digest/daily-digest.png).
 The query pins the populated initial digest even if a later scheduled scan finds
 no new jobs. The preview remains running locally on port 3200 with fake AI on
 3996 and fake job sources on 3995. Runtime: `/tmp/dossier-demo-TfHREk`;
