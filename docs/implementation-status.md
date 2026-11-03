@@ -1,9 +1,85 @@
 # Implementation status
 
-Specification: [implementation-spec.md](implementation-spec.md). Updated 2026-10-23.
-Branch: `feature/configurable-markdown`; pushes are limited to this feature branch.
-No merge or production deployment.
+Specification: [implementation-spec.md](implementation-spec.md). Updated 2026-11-03.
+Branch: `feat/daily-job-digest`; changes remain on the feature branch.
+No merge or private-data deployment. Synthetic Nimbus deployment recorded below.
 Starting upstream: `4fd532973be9ecbae43b55de5e0c3e681f07e493` (Dossier 1.8.1).
+
+## Nimbus fresh deployment — 2026-11-02
+
+Explicit fresh setup authorized on `feat/daily-job-digest` at feature revision
+`6645580bf7efedb51270c5a6f0a8f6f1dd41b4cc`. Settings are in `vps.json`; operations
+are documented in [vps-deployment.md](vps-deployment.md). Target:
+`nim@192.168.8.219:/home/nim/services/dossier-obsidian`, Compose project
+`nimbus-dossier-obsidian`, working directory `deployment`, Compose file
+`deployment/compose.vps.yml`. The planned app URL is `http://192.168.8.219:3200`.
+
+Strict SSH checking verified hostname `nimbus`, Docker 29.9.2 and Compose
+v5.7.0. Preflight found 3447 MiB available RAM, 252 GiB free disk, no conflicting
+project containers or volumes, and no listener on port 3200. Existing Immich
+containers remain healthy and untouched.
+
+After an initial missing-environment validation failure, the user explicitly
+authorized creating fresh configuration. Random database and login passwords,
+an Argon2 login hash and a stable app secret were generated directly on Nimbus.
+The remote `.env` and `login-password` files have owner-only permissions and
+were not printed or downloaded. Compose validation now passes. Added nested
+credential exclusions to `.dockerignore`; credentials are not source inputs.
+
+Uploaded an inspected allowlist of 858 source/configuration files, excluding
+private data, environments, Git metadata and dependency/build output. A source
+manifest is retained locally at `work/vps/source-manifest.json`. Runtime uses
+named volumes seeded from synthetic fixtures, a read-only resume mount and the
+fake AI provider. No firewall changes, VM operations, merge or publication.
+
+Fresh verification completed on Nimbus (2026-11-03): Node 24.19.0 / Yarn
+4.18.1, Corepack, immutable install, Prisma generation, lint, typecheck and
+production build passed. Node's default 1 GiB heap exhausted during the first
+typecheck; explicitly allowing a 1536 MiB heap inside the unchanged 2 GiB
+container limit resolved it. The Compose checks profile records that setting.
+
+Full unit/database suite: 221 files passed, 4 skipped; 1802 tests passed,
+29 optional tests skipped. Coverage passed unchanged thresholds: statements
+86.27%, branches 80.05%, functions 84.79%, lines 88.45%. Unit database tests used
+`dossier_test`; browser tests used their separate `_e2e` database.
+
+Browser suite: 138 passed and 1 failed in 11.8 minutes. The failure repeated on
+its configured retry: `e2e/applications.spec.ts:30`, "moves a card from the
+keyboard", expects the first status menu radio item to have focus at line 35,
+but it remains inactive. Route generation and production compilation passed;
+this was a browser assertion failure, not an out-of-memory container exit.
+Diagnostics remain in the checks container under `/tmp/vps-checks`, with browser
+traces/error contexts under `/app/test-results`.
+
+The user subsequently explicitly authorized starting the app despite the known
+browser failure. A standard production-image build stopped at immutable Yarn
+checksum mismatches for `@prisma/streams-local@0.1.11` and
+`@anthropic-ai/sdk@1.3.0`. Integrity checks and the lockfile were preserved.
+Instead, `deployment/Dockerfile.vps-runtime` packaged the successful production
+standalone output, static assets and public files from the checks container,
+using the existing verified checks image as its base, with build networking
+disabled. Only those artifacts entered the build context; filename-only
+inspection found no environment or login credential files. This runtime retains
+the larger tooling image until a normal slim runtime can be rebuilt.
+
+Runtime image: `nimbus-dossier-obsidian:6645580bf7ef`, manifest list digest
+`sha256:f51aa48e6bda5b183c8a054449813a039fd34de1986a1e1b2e710c73e71f668d`.
+Compose validation and `up -d --wait --wait-timeout 120 app` passed. App,
+PostgreSQL and fake AI are healthy; the fixture initializer completed
+successfully. From the client LAN, both `/api/health` and `/login` returned HTTP
+200 at **http://192.168.8.219:3200**. The port binds only to Nimbus's LAN IP.
+Verified persistent app-data/notes mounts are writable and resume is read-only.
+The remote environment and login password files retain mode 0600. Immich's four
+containers remain healthy and unchanged. The idle checks container is retained
+with its diagnostics. No secrets were printed or downloaded; no private data,
+firewall or VM changes, merge or publication occurred.
+
+Next concrete step: fix the reproducible keyboard-focus failure and verify the
+registry checksum discrepancy before replacing this runtime with the standard
+production image. Preserve the existing remote credentials and named volumes.
+The short cloud-agent brief is [cloud-handoff.md](cloud-handoff.md); committed
+`vps.json` and [vps-deployment.md](vps-deployment.md) retain local deployment
+settings and the verified runtime snapshot without credential values.
 
 ## Container-only review — 2026-10-23
 

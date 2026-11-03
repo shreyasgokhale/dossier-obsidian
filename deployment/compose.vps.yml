@@ -1,0 +1,94 @@
+# Fresh Nimbus setup: synthetic fixtures and fake AI only; secrets live remotely.
+services:
+  db:
+    image: postgres:18.6-alpine@sha256:898c60cb390d1085bc97bdd6a1ae968757421df394b071848b52b1c09c89d6a5
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dossier
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Provision the remote environment}
+      POSTGRES_DB: dossier
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U dossier -d dossier]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    mem_limit: 512m
+  init:
+    image: ${DOSSIER_CHECKS_IMAGE:?Set the feature checks image}
+    user: "0:0"
+    network_mode: none
+    volumes:
+      - notes:/runtime/notes
+      - resume:/runtime/resume
+      - app-data:/runtime/data
+    command:
+      - bash
+      - -ec
+      - |
+        if [ ! -f /runtime/notes/.initialized ]; then
+          cp -R /app/fixtures/notes/. /runtime/notes/
+          touch /runtime/notes/.initialized
+        fi
+        if [ ! -f /runtime/resume/.initialized ]; then
+          cp -R /app/fixtures/resume/. /runtime/resume/
+          touch /runtime/resume/.initialized
+        fi
+        chown -R 1000:1000 /runtime
+  fake-ai:
+    image: ${DOSSIER_CHECKS_IMAGE:?Set the feature checks image}
+    restart: unless-stopped
+    command: [node, e2e/fake-ai.mts]
+    mem_limit: 128m
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3999/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+  app:
+    image: ${DOSSIER_IMAGE:?Set the feature production image}
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+      init: {condition: service_completed_successfully}
+      fake-ai: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql://dossier:${POSTGRES_PASSWORD}@db:5432/dossier
+      DOSSIER_PASSWORD: ${DOSSIER_PASSWORD:?Provision the remote environment}
+      DOSSIER_SECRET: ${DOSSIER_SECRET:?Provision the remote environment}
+      DOSSIER_PUBLIC_URL: http://192.168.8.219:3200
+      DOSSIER_NOTES_ROOT: /notes
+      DOSSIER_RESUME_ROOT: /resume
+      DOSSIER_AI_PROVIDER: openai
+      DOSSIER_AI_URL: http://fake-ai:3999/v1
+      DOSSIER_AI_MODEL: fake-model
+      DOSSIER_AI_KEY: synthetic-demo-key
+      DOSSIER_JOBS_SOURCE: "off"
+      DOSSIER_TELEMETRY: "off"
+      TZ: Europe/Berlin
+    ports:
+      - "192.168.8.219:3200:3000"
+    volumes:
+      - notes:/notes
+      - resume:/resume:ro
+      - app-data:/data
+    mem_limit: 1g
+  checks:
+    profiles: [checks]
+    image: ${DOSSIER_CHECKS_IMAGE:?Set the feature checks image}
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      DATABASE_URL: postgresql://dossier:${POSTGRES_PASSWORD}@db:5432/dossier
+      CI: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_OPTIONS: --max-old-space-size=1536
+    shm_size: 256mb
+    mem_limit: 2g
+    command: [sleep, infinity]
+volumes:
+  postgres-data:
+  notes:
+  resume:
+  app-data:

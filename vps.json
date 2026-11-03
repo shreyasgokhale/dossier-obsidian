@@ -1,0 +1,9 @@
+{
+  "ssh_target": "nim@192.168.8.219",
+  "sudo": true,
+  "project": "nimbus-dossier-obsidian",
+  "remote_dir": "/home/nim/services/dossier-obsidian",
+  "compose_files": ["deployment/compose.vps.yml"],
+  "compose_dir": "deployment",
+  "health_url": "http://192.168.8.219:3200/api/health"
+}
