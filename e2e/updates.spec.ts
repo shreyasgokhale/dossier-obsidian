@@ -48,6 +48,10 @@ test("says a newer release is out until Not now, and again for the next one", as
   await notice.getByRole("button", { name: "Not now" }).click();
   await expect(notice).toBeHidden();
   await expect(page.getByRole("button", { name: /^(Dark|Light) mode$/ })).toBeFocused();
+  // Hiding the notice is optimistic; navigation must follow the stored dismissal.
+  await expect.poll(async () => (await sql<{ value: string }>(
+    'SELECT value FROM "Setting" WHERE key = $1', ["updateDismissed"],
+  ))[0]?.value).toBe("99.0.0");
   await page.goto("/applications");
   await expect(page.getByRole("region", { name: /is out$/ })).toBeHidden();
 

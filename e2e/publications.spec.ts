@@ -31,6 +31,16 @@ test("adds a publication with italics and a DOI, and shows it on the base resume
   await expect(page.getByLabel(/^Link/)).toHaveValue("https://doi.org/10.5555/98765");
   await expect(page.getByText("Saved just now")).toBeVisible();
 
+  // The header can still describe the citation save while the normalized DOI
+  // is debounced. Wait for this exact edit to persist before reloading.
+  await expect.poll(async () => sql<{ citation: string; link: string }>(
+    'SELECT citation, link FROM "Publication" WHERE link = $1',
+    ["https://doi.org/10.5555/98765"],
+  )).toEqual([{
+    citation: "Doe, J. (2024). Calm payouts. *Journal of Studies*, 12(3), 45–67.",
+    link: "https://doi.org/10.5555/98765",
+  }]);
+
   await page.reload();
   await expect(page.getByRole("button", { name: /Doe, J\. \(2024\)\. Calm payouts.*doi\.org\/10\.5555\/98765/ })).toBeVisible();
 

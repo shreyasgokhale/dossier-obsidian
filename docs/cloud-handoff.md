@@ -1,5 +1,16 @@
 # Cloud handoff — 2026-11-03
 
+Follow-up completed 2026-11-11: the hydration-time keyboard focus failure is
+fixed and covered by slow-client regression tests. Standard ARM64 and AMD64
+production images build with the original lockfile and checksum enforcement.
+Fresh registry/cache checks did not reproduce the historical YN0018 errors.
+All 1,802 unit/database tests, 142 browser tests and the complete Markdown
+workflow pass; 29 optional live tests remain skipped. See
+[implementation evidence](implementation-status.md#cloud-handoff-follow-up--2026-11-1011)
+for diagnosis, additional test synchronization fixes and local image identities.
+No merge, deployment or Nimbus access was performed; the existing remote runtime
+was preserved. The original handoff below is retained as context.
+
 Branch: `feat/daily-job-digest`. Fix the following without merging or deploying.
 Use synthetic fixtures and fake AI; no Nimbus access or credentials are required.
 Follow `AGENTS.md` and `docs/markdown-runbook.md` for isolated test setup.

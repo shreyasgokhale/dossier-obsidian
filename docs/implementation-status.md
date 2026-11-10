@@ -437,3 +437,124 @@ Next concrete step: review the populated synthetic preview and feature-branch
 diff, then allow the public API hosts via the supported environment configuration
 and verify low-volume real requests with official employer slugs and any desired
 paid-source keys. Do not merge or deploy as part of this task.
+
+## Cloud handoff follow-up — 2026-11-10–11
+
+Work remains on `feat/daily-job-digest`. The scope is the two blockers in
+[cloud-handoff.md](cloud-handoff.md). No Nimbus connection, credentials, private
+vaults, merge, publication or deployment were used. All browser/AI/source inputs
+are synthetic. The existing deployed runtime was not accessed or changed.
+
+### Keyboard focus
+
+The original production-browser test passed locally, including 20 repeats.
+Adding 8× client CPU throttling reproduced the exact inactive-first-radio-item
+failure in all five attempts. Event instrumentation showed Enter arriving before
+Radix's document keyboard listener registered during hydration. The menu opened
+with focus on its container; Radix's keyboard-modality flag remained false.
+
+The shared dropdown wrapper records opening intent at the trigger and moves
+container focus into the first enabled item for keyboard openings. It preserves
+pointer behavior, caller handlers, refs, Radix navigation and dismissal. The
+existing board navigation assertions remain; slow-client variants exercise Enter,
+Space and ArrowDown, plus Escape/focus return and reopening. All 20 repeated
+keyboard workflows pass after the fix (21 tests including sign-in). Existing
+dropdown component tests also pass (9 tests). The minimized reproduction and
+timings are recorded in [keyboard evidence](evidence/keyboard-focus-2026-11-10.md).
+Temporary probes are confined to ignored `work/`; no application debug logging
+was retained.
+
+### Production dependency integrity
+
+The reported YN0018 errors did not reproduce with fresh downloads. Node 24.19.0
+and Yarn 4.18.1 accept the existing lockfile on macOS ARM64 and clean Linux
+ARM64/AMD64 dependency builds. `yarn install --immutable --check-cache` also passes
+inside the Linux dependency image, comparing re-fetched packages with both cache
+and lockfile. Neither `yarn.lock`, package versions, Dockerfile nor checksum
+validation was changed.
+
+For each reported package, two downloads from each of `registry.npmjs.org` and
+`registry.yarnpkg.com` were identical and matched the public registry's SHA-512
+`dist.integrity`. Separately, the Yarn ZIP SHA-512 values matched the complete
+existing lockfile checksums on both macOS and Linux ARM64. See
+[sanitized package evidence](evidence/dependency-integrity-2026-11-10.jsonl) and
+[repeatable checksum checks](markdown-runbook.md#diagnosing-production-dependency-checksums).
+The earlier failing host's response/cache bytes are unavailable, so its historical
+root cause is unproven; these results do not justify changing trusted checksums.
+
+The standard production Dockerfile builds successfully, including its separate
+`npm ci` migration tools and bundled Chromium. The final ARM64 image
+`dossier-readiness:local` was started normally on loopback port 3310 against fresh
+`dossier_image_e2e`: all additive migrations and built-in seeding passed. A real
+browser smoke check against that image passed health, slow-client menu focus,
+Escape/focus return and Chromium-generated PDF checks. No checks-image packaging
+workaround was used.
+
+Both final local artifacts build through `--target production`; nothing was
+pushed to a registry. Image identities reported by Docker:
+
+```text
+dossier-readiness:local  arm64  sha256:1e19e8a7cd5939126808e0f1fbc13defb6803a1346444e77f8e7b9036d4d31c4
+dossier-readiness:amd64  amd64  sha256:1fbdcc3fe7be3b7a24b399a86bf5ff292cc6d62f0e0e1290171dd5ab45dbf366
+```
+
+The refreshed ARM64 artifact passed the same browser/PDF smoke check. Its normal
+runtime user is `1000:1000` (`node`); the fresh database applied 38 migrations
+and the explicit synthetic demo seed created nine applications. AMD64 packaging
+was verified under emulation; runtime smoke verification used native ARM64.
+
+### Validation checkpoint
+
+The first complete browser run passed **139 tests** and exposed three additional
+test failures: calendar UTC timestamps interpreted in the Berlin host timezone,
+the previously recorded publication autosave race, and its dependent test. The
+calendar/publication cases both failed again in a focused 26-second run before
+the verification fixes. A synthetic SQL timestamp of `2026-11-11 14:00:00` was
+read by pg as `13:00Z` on this host, whereas Prisma stores these columns in UTC.
+Playwright now pins both the Node runner and browser to UTC. The publication
+trace contained only creation and citation-save requests before reload, with the
+DOI edit still debounced. The test now polls for the exact stored citation and
+normalized DOI before reloading, retaining every UI/resume/PDF assertion. The
+five-test calendar/publication file rerun passes. No production calendar or
+autosave behavior was changed.
+
+The next complete run passed **140 tests**, including all calendar/publication
+checks, and exposed two optimistic-navigation test races: the roles were reloaded
+before their drag order committed, and the update notice was navigated away from
+before its dismissal committed. Both files passed when isolated (3 tests including
+setup). Their existing optimistic UI assertions remain; the tests now also poll
+the exact stored order/dismissed version before navigation, so a persistence
+failure still fails the test. No production ordering or update-notice behavior
+was changed. All ten repeated reorder/update workflows pass after the test fixes
+(11 tests including setup). Final browser verification runs without concurrent
+image builds. The only application-runtime change remains dropdown focus.
+
+Corepack was enabled in a workspace-local bin directory; the exact Node/Yarn
+versions above were used. Immutable install, Prisma generation, lint, typecheck,
+`yarn test` and production build pass. Full `yarn test:coverage --maxWorkers=2`
+passes: **1,802 passed / 29 optional tests skipped**, 221 files passed / 4 skipped.
+All existing thresholds are unchanged: global lines **88.46%**, statements
+**86.29%**, functions **84.80%**, branches **80.05%**. Tests use only a disposable
+PostgreSQL 18.6 container on loopback port 55432; database test names end in `_test`.
+
+Final verification completed on 2026-11-11:
+
+- `yarn test:e2e`: **142 passed**, 4.2 minutes, without retries.
+- `yarn test:e2e:markdown`: **1 passed**, 34.5 seconds; complete synthetic
+  Markdown/resume/AI workflow. Screenshots went to ignored `work/screenshots`.
+- Standard ARM64 and AMD64 production images: both built; native ARM64 runtime
+  health, slow keyboard focus, Escape return and PDF smoke checks passed.
+- Lint, typecheck and `git diff --check`: pass after the final test changes.
+- Dependency pins, checksum validation, committed fixtures and all coverage
+  thresholds remain unchanged.
+
+Raw local logs and diagnostic harnesses are in ignored `work/logs` and
+`work/debug`. Disposable local test containers/network are removed after
+verification; the two production images remain available locally. No remote
+runtime was contacted or replaced.
+
+Next concrete step: review the feature-branch diff and the locally built
+production artifacts against the handoff. No merge or deployment was performed.
+If the original host later reports YN0018 again, preserve
+its failing package response/cache archive and sanitized registry configuration
+for comparison with this audit before changing any dependency pin.

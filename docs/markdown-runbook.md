@@ -331,3 +331,32 @@ export-version collisions explicitly before importing newer upstream formats.
 Review new upstream fields for mappings instead of copying personal configuration
 into source. Optional subtree/submodule integration is a convenience only; it is
 not required for build, tests or deployment.
+
+## Diagnosing production dependency checksums
+
+Keep `yarn.lock` and checksum validation intact if an install reports YN0018.
+First reproduce the dependency stage with an empty build cache, independently of
+any running app or previously installed checks image:
+
+```sh
+docker build --no-cache --target deps --progress plain -t dossier-integrity-check .
+# Use --platform linux/amd64 when checking an amd64 deployment from an ARM host.
+docker run --rm dossier-integrity-check yarn install --immutable --check-cache
+```
+
+`--check-cache` fetches packages again and checks the lockfile and cached archives.
+Retain the failing package/version, registry host, Yarn/Node versions and the
+reported expected/actual checksums. Compare public tarball bytes with the registry's
+published `dist.integrity`; Yarn's cache ZIP checksum is a separate value. Do not
+replace lockfile checksums just because a different response was downloaded.
+If a clean install passes, validate the complete standard production target before
+replacing any existing runtime. Avoid printing proxy credentials or auth headers.
+
+The 2026-11-10 audit of `@anthropic-ai/sdk@1.3.0` and
+`@prisma/streams-local@0.1.11` found matching repeated npm/Yarn registry tarballs
+and matching lockfile cache checksums on macOS ARM64 and Linux ARM64. A clean
+Linux AMD64 dependency installation also passed. Sanitized registry evidence is
+in [the integrity audit](evidence/dependency-integrity-2026-11-10.jsonl).
+Those results do not identify the cause of the earlier host's mismatched bytes;
+that requires the failing response or cache archive. No production-host access is
+needed for the checks above.
