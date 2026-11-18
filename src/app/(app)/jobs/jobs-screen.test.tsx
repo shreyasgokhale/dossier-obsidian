@@ -307,9 +307,15 @@ describe("the results", () => {
   });
 
   it("links a posting you've applied for to its application", () => {
-    renderScreen({ search: stored([posting("a", { state: { ...state, applicationId: "app-1" } })]) });
+    renderScreen({ search: stored([posting("a", { state: { ...state, applicationId: "app-1", submitted: true } })]) });
     expect(within(screen.getByRole("list", { name: "Postings" })).getByText("Applied")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the application" })).toHaveAttribute("href", "/applications/app-1");
+  });
+
+  it("labels an application that has not been submitted as a draft", () => {
+    renderScreen({ search: stored([posting("a", { state: { ...state, applicationId: "draft-1" } })]) });
+    expect(within(screen.getByRole("list", { name: "Postings" })).getByText("Draft")).toBeInTheDocument();
+    expect(screen.getByRole("note")).toHaveTextContent("You have an application draft for this.");
   });
 
   it("says when nothing was found", () => {

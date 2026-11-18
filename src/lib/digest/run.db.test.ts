@@ -1,5 +1,9 @@
-import { beforeEach, afterAll, expect, it, vi } from "vitest";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { beforeEach, afterEach, afterAll, expect, it, vi } from "vitest";
 import { createTestClient, resetDatabase } from "@/test/db";
+import { seedBuiltIns } from "../../../prisma/seed/built-ins";
 import { saveSettings } from "@/lib/settings-data";
 import { DEFAULT_PREFERENCES } from "./preferences";
 import {
@@ -11,6 +15,9 @@ import { discover } from "./search";
 import { loadDigestView } from "./view";
 import { buildExport } from "@/lib/data-export";
 import { importExport, parseExport } from "@/lib/data-import";
+import { approveCandidate } from "@/lib/agent/draft";
+import { reconcile } from "@/lib/markdown/service";
+import { exportObsidian, syncDocuments } from "@/lib/markdown/documents";
 import { demoProfile } from "@/lib/demo-profile";
 import type { FoundPosting } from "@/lib/job-search/search";
 import type { JobContext } from "@/lib/jobs/runner";
@@ -19,6 +26,9 @@ const state = vi.hoisted(() => ({
   db: undefined as ReturnType<typeof createTestClient> | undefined,
   calls: [] as string[],
   fail: false,
+  failPreparation: false,
+  allowedDraftUrl: undefined as string | undefined,
+  serviceNotesRoot: undefined as string | undefined,
 }));
 vi.mock("@/lib/prisma", async () => {
   const { createTestClient } = await import("@/test/db");
@@ -26,7 +36,22 @@ vi.mock("@/lib/prisma", async () => {
   return { prisma: state.db };
 });
 vi.mock("./search", () => ({ discover: vi.fn() }));
-vi.mock("@/lib/ai/config", () => ({ isAiConfigured: async () => true }));
+vi.mock("@/lib/env", async (importOriginal) => {
+  const { env } = await importOriginal<typeof import("@/lib/env")>();
+  return {
+    env: new Proxy(env, {
+      get: (target, key) => {
+        if (key === "DOSSIER_DIGEST_DRAFT_AI_URL") return state.allowedDraftUrl;
+        if (key === "DOSSIER_SERVICE_NOTES_ROOT") return state.serviceNotesRoot;
+        return Reflect.get(target, key);
+      },
+    }),
+  };
+});
+vi.mock("@/lib/ai/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/ai/config")>()),
+  isAiConfigured: async () => true,
+}));
 vi.mock("@/lib/profile-data", async () => ({
   loadProfile: async () => demoProfile(),
 }));
@@ -36,6 +61,28 @@ vi.mock("@/lib/ai", () => ({
       reply: (call) => {
         const text = call.messages[0].content;
         state.calls.push(text);
+        switch (call.json?.name) {
+          case "extracted_posting":
+            return {
+              title: "Product Designer · Demo a",
+              company: "Demo a",
+              role: "Product Designer",
+              location: "Berlin",
+              mode: "",
+              salary: "",
+              deadline: null,
+              requirements: [{ text: "Figma experience", kind: "skill", skill: "Figma", years: null, language: null }],
+              asksForReferences: false,
+              language: "English",
+            };
+          case "requirement_matches":
+            return { matches: [{ requirement: 1, skill: "Figma", language: null }] };
+          case "tailored_resume":
+            if (state.failPreparation) return "invalid json";
+            return { summary: "Product designer.", roles: [], projects: [], skills: ["Figma"], education: [] };
+          case "cover_letter":
+            return { recipient: "Hiring team", greeting: "Dear hiring team,", paragraphs: [{ label: "Opening", text: "I design complex products." }], signOff: "Regards," };
+        }
         if (state.fail && text.includes('"title": "Broken"'))
           return "invalid json";
         return {
@@ -76,6 +123,9 @@ beforeEach(async () => {
   await resetDatabase(db());
   state.calls = [];
   state.fail = false;
+  state.failPreparation = false;
+  state.allowedDraftUrl = undefined;
+  state.serviceNotesRoot = undefined;
   await saveSettings({
     searchPreferences: { ...DEFAULT_PREFERENCES, roles: ["Product Designer"] },
     agentEnabled: true,
@@ -98,6 +148,7 @@ beforeEach(async () => {
     ],
   });
 });
+afterEach(() => vi.unstubAllEnvs());
 afterAll(async () => {
   await db().$disconnect();
 });
@@ -128,6 +179,107 @@ it("persists strong/stretch/below results with unknowns despite source failure, 
   );
   expect(again.scored).toBe(0);
 });
+async function enableLocalDrafts() {
+  await seedBuiltIns(db());
+  await saveSettings({
+    provider: "LOCAL",
+    baseUrl: "http://synthetic-ai.example",
+    model: "synthetic",
+    pageLimit: "none",
+    agentMaxDrafts: 1,
+  });
+  vi.stubEnv("DOSSIER_PASSWORD", "argon2id:m=19456,t=2,p=1:CLZW5wQoCjh3Q9CHBp_JWw:Ak2xS7TYlYYrhemlgBkVxFmWXfcMq_rjd0mJGZcZFfA");
+  vi.stubEnv("DOSSIER_SECRET", "s".repeat(40));
+  state.allowedDraftUrl = "http://synthetic-ai.example";
+}
+
+it("makes a prepared strong match available for review without submitting it", async () => {
+  await enableLocalDrafts();
+  expect(await runDailyDigest(true, context(), now)).toMatchObject({
+    scored: 3,
+    drafted: 1,
+  });
+  const items = (await loadDigestView()).digest?.items;
+  const strong = items?.find((item) => item.kind === "strong");
+  expect(strong).toMatchObject({
+    preparation: { status: "DRAFTED", error: null, applicationId: expect.any(String) },
+    state: { applicationId: null },
+  });
+  expect(items?.filter((item) => item.preparation.applicationId)).toHaveLength(1);
+  const prepared = await db().application.findUniqueOrThrow({
+    where: { id: strong!.preparation.applicationId! },
+    include: { documents: true },
+  });
+  expect(prepared).toMatchObject({ status: "DRAFT", awaitingReview: true, sentAt: null });
+  expect(prepared.documents.map((document) => document.kind).sort()).toEqual(["COVER_LETTER", "RESUME"]);
+  expect(await runDailyDigest(true, context(), new Date(now.getTime() + 3600001))).toMatchObject({ drafted: 0 });
+  expect((await loadDigestView()).digest?.items).toContainEqual(expect.objectContaining({
+    id: strong?.id,
+    preparation: expect.objectContaining({ applicationId: prepared.id }),
+  }));
+});
+
+it("retries a failed preparation on a later digest without scoring the same role again", async () => {
+  await enableLocalDrafts();
+  state.failPreparation = true;
+  expect(await runDailyDigest(true, context(), now)).toMatchObject({ drafted: 0, scored: 3 });
+  const failed = (await loadDigestView()).digest?.items.find((item) => item.kind === "strong");
+  expect(failed?.preparation).toMatchObject({ status: "SCORED", error: expect.any(String), applicationId: null });
+
+  state.failPreparation = false;
+  const retry = new Date(now.getTime() + 3600001);
+  expect(await runDailyDigest(true, context(), retry)).toMatchObject({ drafted: 1, scored: 0 });
+  expect((await loadDigestView()).digest?.items[0]).toMatchObject({
+    id: failed?.id,
+    preparation: { status: "DRAFTED", error: null, applicationId: expect.any(String) },
+  });
+});
+
+it("leaves queued roles alone when the owner has already pursued them through another source", async () => {
+  await runDailyDigest(true, context(), now);
+  await enableLocalDrafts();
+  await db().application.create({
+    data: { company: "Demo a", role: "Product Designer", postingUrl: "https://other.example/alternate-role" },
+  });
+  const retry = new Date(now.getTime() + 3600001);
+  expect(await runDailyDigest(true, context(), retry)).toMatchObject({ drafted: 0, scored: 0 });
+  expect(await db().application.count()).toBe(1);
+});
+
+it("does not sync a linked digest package after the writable notes root is retargeted", async () => {
+  const runtime = await mkdtemp(join(tmpdir(), "dossier-projection-"));
+  try {
+    const notes = join(runtime, "notes");
+    const data = join(runtime, "data");
+    const other = join(runtime, "retargeted");
+    await Promise.all([mkdir(notes), mkdir(data)]);
+    vi.stubEnv("DOSSIER_NOTES_ROOT", notes);
+    vi.stubEnv("DOSSIER_DATA_DIR", data);
+    vi.stubEnv("DOSSIER_SERVICE_NOTES_ROOT", notes);
+    state.serviceNotesRoot = notes;
+    await enableLocalDrafts();
+    await runDailyDigest(true, context(), now);
+    const prepared = (await loadDigestView()).digest?.items.find((item) => item.preparation.applicationId);
+    const applicationId = await approveCandidate(prepared!.id);
+    await reconcile();
+    await syncDocuments();
+    await exportObsidian();
+    const file = join("Dossier", "Views", `${applicationId}.md`);
+    const previous = await readFile(join(notes, file), "utf8");
+    expect(previous).toContain("Demo a");
+    await cp(notes, other, { recursive: true });
+
+    vi.stubEnv("DOSSIER_NOTES_ROOT", other);
+    await db().application.update({ where: { id: applicationId }, data: { company: "Do not export here" } });
+    await reconcile();
+    await syncDocuments();
+    await exportObsidian();
+    expect(await readFile(join(other, file), "utf8")).toBe(previous);
+  } finally {
+    await rm(runtime, { recursive: true, force: true });
+  }
+});
+
 it("does not resurface saved, dismissed, pursued or cross-source duplicates", async () => {
   const saved = job("saved"),
     dismissed = job("dismissed"),

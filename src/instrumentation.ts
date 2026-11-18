@@ -34,7 +34,8 @@ export async function register() {
     );
 
     // The job agent's daily run, while it's on (E16-4).
-    const { startAgentSchedule } = await import("@/lib/agent/schedule");
+    const { resetInterruptedDrafts, startAgentSchedule } = await import("@/lib/agent/schedule");
+    await resetInterruptedDrafts().catch((error: unknown) => logServerError("job agent draft recovery", error));
     startAgentSchedule();
 
     // Startups' daily refresh, once it was refreshed by hand and while the screen is in use (#222).

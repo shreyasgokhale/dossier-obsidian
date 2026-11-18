@@ -53,6 +53,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
     apiKey: string | null,
     model: string | null,
     timeoutMs: number,
+    request?: typeof fetch,
   ) {
     super(model, timeoutMs);
     // Local servers often need no key, but the SDK insists on one.
@@ -62,7 +63,7 @@ export class OpenAICompatibleProvider extends BaseProvider {
       timeout: timeoutMs,
       maxRetries: 1,
       // With a key attached, no redirects to other hosts (E11-5).
-      ...(apiKey ? { fetch: keyGuardedFetch() } : {}),
+      fetch: apiKey ? keyGuardedFetch(request) : request,
     });
     this.noThinking = isDeepSeek(baseURL);
   }

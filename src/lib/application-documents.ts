@@ -26,6 +26,9 @@ export const loadApplication = cache(async (id: string) => {
     include: {
       documents: { include: { theme: { select: THEME_FIELDS } } },
       messages: { orderBy: { createdAt: "asc" } },
+      agentCandidate: {
+        select: { digestItems: { orderBy: { digest: { startedAt: "desc" } }, take: 1, select: { digestId: true } } },
+      },
       notes: true,
       events: { select: { id: true, to: true, at: true } },
       facts: { select: { id: true, text: true }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] },

@@ -44,6 +44,7 @@ export function appEnv(): Record<string, string> {
     DOSSIER_AI_URL: `http://localhost:${FAKE_AI_PORT}/v1`,
     DOSSIER_AI_MODEL: "fake-model",
     DOSSIER_AI_KEY: "e2e-fake-key",
+    DOSSIER_DIGEST_DRAFT_AI_URL: `http://localhost:${FAKE_AI_PORT}`,
     // Consent tests must exercise the app's question even when a developer's
     // .env forces telemetry off. Pings are routed only to the fake service.
     DOSSIER_TELEMETRY: "",

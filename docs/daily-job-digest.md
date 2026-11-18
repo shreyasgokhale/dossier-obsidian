@@ -2,13 +2,41 @@
 
 Search Preferences describes search intent, independently of Profile and the read-only career collection. Open **Daily digest → Search Preferences**, enter up to four roles and three city/country pairs, select sources, and enable the daily schedule. `preferred` remote work influences scoring; `only` and `onsite` (non-remote) require an explicit source flag. A false remote flag is displayed as Not remote, rather than assuming on-site attendance. Exclusions match phrases in company, title and description. Interests are supplied to the scorer as intent, never evidence of experience.
 
-The digest uses the existing `agent-scan` background job and daily timer, hour/time zone, scoring cap and run limits (three runs per 24 hours; manual runs at least one hour apart). One server process must remain running. Configuring preferences switches subsequent agent scans to digest discovery. The legacy agent workflow remains available when preferences have never been configured; its previous candidates/drafts are preserved. Digest candidates are reviewed in Daily digest, separately from the legacy Agent queue. Automatic drafting settings do not apply to digest scans.
+The digest uses the existing `agent-scan` background job and daily timer, hour/time zone, scoring cap and run limits (three runs per 24 hours; manual runs at least one hour apart). One server process must remain running. Configuring preferences switches subsequent agent scans to digest discovery. The legacy agent workflow remains available when preferences have never been configured; its previous candidates/drafts are preserved. Digest candidates are reviewed in Daily digest, separately from the legacy Agent queue.
 
-Each enabled source is queried independently. Successful results survive failures of other sources, boards or individual scores. Source status and each run are durable, independent of background-job retention. New discoveries are stored in `DailyDigest.discovered`; scored results use the existing `AgentCandidate` records with digest membership. Results beyond the scoring cap are retained in the discovery snapshot and may be scored on later runs. There is no automatic email, application submission or document generation.
+Each enabled source is queried independently. Successful results survive failures of other sources, boards or individual scores. Source status and each run are durable, independent of background-job retention. New discoveries are stored in `DailyDigest.discovered`; scored results use the existing `AgentCandidate` records with digest membership. Results beyond the scoring cap are retained in the discovery snapshot and may be scored on later runs. The digest does not send email or submit applications.
 
 Strong matches use the agent's configured minimum score (70 by default). Up to three best scores below that threshold, and at least `max(50, minimum - 20)`, are marked stretch roles. Other scored roles remain available under Lower matches. Reasons and gaps come from the existing profile scorer. Missing salary, unknown work arrangement and partial descriptions are explicitly marked. Scores are provisional assessments, not verified employer requirements.
 
-Canonical links ignore tracking parameters; a second identity normalizes company/title, accents and common gender suffixes. All locations of the same role at one employer are deliberately treated as one opportunity. This conservative deduplication may combine genuinely different vacancies. Saved/dismissed postings, existing agent candidates and already pursued applications suppress later results, including cross-source aliases. Dismissing in the digest reuses the existing agent dismissal and posting storage. Saving uses Find jobs' Saved view. Start application uses the existing posting → New application → Create application path. Discovery and saving never create per-job Markdown files. After the user creates an application, normal Markdown/application workflows apply.
+Canonical links ignore tracking parameters; a second identity normalizes company/title, accents and common gender suffixes. All locations of the same role at one employer are deliberately treated as one opportunity. This conservative deduplication may combine genuinely different vacancies. Saved/dismissed postings, existing agent candidates and already pursued applications suppress later results, including cross-source aliases. Dismissing in the digest reuses the existing agent dismissal and posting storage. Saving uses Find jobs' Saved view. Start application uses the existing posting → New application → Create application path. Discovery and saving never create per-job Markdown files.
+
+## Prepared applications
+
+In Settings → Job agent, turn on **Prepare drafts on its own** and set the
+per-run limit. The deployment must set `DOSSIER_DIGEST_DRAFT_AI_URL` to the same
+endpoint as the Local model or LM Studio setting. Automatic preparation uses
+this local endpoint directly and rejects redirects. This setting is optional,
+and automatic preparation pauses if the endpoint has not been approved.
+Discovery and scoring retain their existing AI provider settings.
+
+The digest prepares complete strong matches in score order, up to the run
+limit. Jobs with partial descriptions can still enter the manual application
+flow. Later runs can retry eligible packages from prior runs when capacity is
+available and search preferences still match. Each draft contains a CV and a
+cover letter. Preparation failures are displayed on the role. The latest
+digest also shows packages that still await review.
+
+Open **Review CV and cover letter** to edit or export the documents.
+**Keep as application draft** adds the package to Applications with Draft
+status. It preserves the documents and sends nothing. Use the Applications
+archive when you want to keep completed draft work without pursuing the role.
+
+Before enabling the Markdown bridge for this deployment, provision a
+service-owned writable notes projection outside the authored vault. Set
+`DOSSIER_SERVICE_NOTES_ROOT` to the same absolute path as `DOSSIER_NOTES_ROOT`
+inside the app. Digest packages stay in Dossier's database until this
+projection is configured. Keep the authored vault outside any writable mount
+or synchronization path, including the existing manual application bridge.
 
 ## Markdown preferences
 
@@ -113,4 +141,4 @@ Review:
 
 `runtime.json` contains safe runtime selectors; `runtime.env.json` contains isolated demo runtime credentials and must remain local. Stop with Ctrl-C. To repeat from a fresh state, run the same preview command after stopping the previous process; no reset flag is needed. To remove a preview, drop only its printed `dossier_demo_<random>` database and remove only its printed temporary directory.
 
-Verification commands follow AGENTS.md: lint, typecheck, test, production build and Playwright e2e. Focused coverage includes source isolation, duplicate suppression, scoring limits/failures, no automatic applications/drafts/Markdown, backup restore, preferences conflicts and the complete synthetic browser flow. See [implementation-status.md](implementation-status.md) for actual run results and retained evidence.
+Verification commands follow AGENTS.md: lint, typecheck, test, production build and Playwright e2e. Focused coverage includes source isolation, duplicate suppression, scoring limits/failures, approval and draft status, preparation retries, backup restore, preferences conflicts and the complete synthetic browser flow. See [implementation-status.md](implementation-status.md) for actual run results and retained evidence.

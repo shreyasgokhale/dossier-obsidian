@@ -43,11 +43,12 @@ export class LmStudioProvider extends OpenAICompatibleProvider {
     private readonly apiKey: string | null,
     model: string | null,
     timeoutMs: number,
+    request?: typeof fetch,
   ) {
     const root = address.replace(/\/+$/, "").replace(/(\/api)?\/v1$/, "");
-    super("LMSTUDIO", `${root}/v1`, apiKey, model, timeoutMs);
+    super("LMSTUDIO", `${root}/v1`, apiKey, model, timeoutMs, request);
     this.root = root;
-    this.api = apiKey ? keyGuardedFetch() : fetch;
+    this.api = apiKey ? keyGuardedFetch(request) : request ?? fetch;
   }
 
   protected override async chat(call: ChatCall): Promise<ChatAnswer> {

@@ -22,6 +22,7 @@ vi.mock("@/components/toast", () => ({
 vi.mock("../agent/actions", () => ({
   runAgentNow: vi.fn(),
   dismissAgentCandidate: vi.fn(),
+  approveAgentDraft: vi.fn(),
 }));
 vi.mock("../jobs/actions", () => ({ savePostingForLater: vi.fn() }));
 vi.mock("../jobs/use-start-application", () => ({
@@ -55,6 +56,7 @@ const item = {
     score: null,
   },
   dismissed: false,
+  preparation: { status: "SCORED" as const, error: null, applicationId: null },
 };
 const view: DigestView = {
   history: [
@@ -165,4 +167,31 @@ it("provides setup guidance, and keeps dismissed or pursued jobs out of cards", 
   );
   expect(screen.queryByText("Demo Tools")).not.toBeInTheDocument();
   expect(screen.getByRole("status")).toHaveTextContent("Starting discovery");
+});
+
+it("links a prepared package for review and keeps a failed preparation visible", () => {
+  render(
+    <DigestScreen
+      view={{
+        ...view,
+        digest: {
+          ...view.digest!,
+          items: [
+            { ...item, preparation: { status: "DRAFTED", error: null, applicationId: "prepared" } },
+            {
+              ...item,
+              id: "failed",
+              preparation: { status: "SCORED", error: "The model did not respond.", applicationId: null },
+            },
+          ],
+        },
+      }}
+      configured
+      enabled
+      runJobId={null}
+    />,
+  );
+  expect(screen.getByRole("link", { name: "Review CV and cover letter" })).toHaveAttribute("href", "/applications/prepared");
+  expect(screen.getByText(/The model did not respond/)).toBeVisible();
+  expect(screen.getAllByRole("button", { name: "Start application" })).toHaveLength(1);
 });

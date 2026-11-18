@@ -93,6 +93,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
         showPhoto,
         archived: application.archivedAt !== null,
         awaitingReview: application.awaitingReview,
+        reviewDigestId: application.agentCandidate?.digestItems[0]?.digestId,
         nextInterviewAt,
       }}
       timeZone={timeZone}

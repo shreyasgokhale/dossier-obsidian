@@ -20,6 +20,7 @@ export class OllamaProvider extends BaseProvider {
     private readonly host: string,
     model: string | null,
     timeoutMs: number,
+    private readonly request: typeof fetch = fetch,
   ) {
     super(model, timeoutMs);
   }
@@ -28,7 +29,7 @@ export class OllamaProvider extends BaseProvider {
   private client(signal: AbortSignal): Ollama {
     return new Ollama({
       host: this.host,
-      fetch: (input, init) => fetch(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }),
+      fetch: (input, init) => this.request(input, { ...init, signal: init?.signal ? AbortSignal.any([init.signal, signal]) : signal }),
     });
   }
 

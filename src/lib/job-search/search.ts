@@ -100,6 +100,7 @@ export type PostingState = {
   dismissed: boolean;
   /** The application made from it, or from the same link before Find jobs. */
   applicationId: string | null;
+  submitted?: boolean;
   /** How well it fits the profile, once it's scored (#208). */
   score: PostingFit | null;
 };

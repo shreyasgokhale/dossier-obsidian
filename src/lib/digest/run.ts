@@ -1,12 +1,16 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
 import { AiError } from "@/lib/ai/errors";
+import { env } from "@/lib/env";
 import { logServerError } from "@/lib/log";
 import { getAiProvider } from "@/lib/ai";
-import { isAiConfigured } from "@/lib/ai/config";
+import { isAiConfigured, loadAiConfig } from "@/lib/ai/config";
 import { loadTaskOptions } from "@/lib/ai/task-options";
 import { scorePosting } from "@/lib/ai/tasks";
 import { candidateData } from "@/lib/agent/candidates";
+import { draftCandidate } from "@/lib/agent/draft";
+import { providerOption } from "@/lib/ai/provider-options";
+import { jobSourceContext } from "@/lib/jobs/source-context";
 import {
   recordRunStart,
   recordRunEnd,
@@ -22,6 +26,7 @@ import type { JobContext } from "@/lib/jobs/runner";
 import { prisma } from "@/lib/prisma";
 import { loadProfile } from "@/lib/profile-data";
 import { saveScore } from "@/lib/posting-scores";
+import type { SettingsData } from "@/lib/settings";
 import { loadSettings } from "@/lib/settings-data";
 import { identityKeys } from "./identity";
 import { discover } from "./search";
@@ -43,9 +48,15 @@ export async function digestSetupProblem(
     return "Choose an AI provider in Settings → AI provider first.";
   return null;
 }
-export async function unseenDigestPostings(postings: FoundPosting[]) {
+export async function unseenDigestPostings<T extends Parameters<typeof identityKeys>[0]>(
+  postings: T[],
+  queuedCandidateIds: string[] = [],
+): Promise<T[]> {
   const [candidates, stored, applications] = await Promise.all([
-    prisma.agentCandidate.findMany(),
+    prisma.agentCandidate.findMany({
+      where: { id: { notIn: queuedCandidateIds } },
+      select: { source: true, externalId: true, url: true, company: true, title: true, place: true, identityKeys: true },
+    }),
     prisma.posting.findMany({
       where: {
         OR: [
@@ -87,6 +98,79 @@ export async function unseenDigestPostings(postings: FoundPosting[]) {
     return !known;
   });
 }
+async function prepareStrongMatches(
+  digest: { id: string; demo: boolean },
+  settings: SettingsData,
+  context: JobContext,
+  profile: Awaited<ReturnType<typeof loadProfile>>,
+): Promise<{ drafted: number; summary: string }> {
+  const idle = { drafted: 0, summary: "" };
+  if (!settings.agentAutoDraft || settings.agentMaxDrafts === 0 || context.signal.aborted)
+    return idle;
+  const paused = {
+    drafted: 0,
+    summary: " Automatic preparation is paused until the configured local AI endpoint is approved for preparation.",
+  };
+  const allowedUrl = env.DOSSIER_DIGEST_DRAFT_AI_URL;
+  if (!allowedUrl) return paused;
+  const source = jobSourceContext.getStore();
+  const config = source?.config ?? await loadAiConfig();
+  if (!providerOption(config.provider).local || !config.model ||
+      config.baseUrl.replace(/\/+$/, "") !== allowedUrl) return paused;
+
+  const eligible = { status: "SCORED", complete: true, score: { gte: settings.agentMinScore } } as const;
+  const identityFields = { id: true, source: true, externalId: true, url: true, company: true, title: true, place: true } as const;
+  const [newMatches, backlog] = await Promise.all([
+    prisma.agentCandidate.findMany({
+      where: { ...eligible, digestItems: { some: { digestId: digest.id, kind: "strong" } } },
+      orderBy: [{ score: "desc" }, { id: "asc" }],
+      select: identityFields,
+    }),
+    prisma.agentCandidate.findMany({
+      where: {
+        ...eligible,
+        AND: [
+          { digestItems: { none: { digestId: digest.id } } },
+          { digestItems: { some: {
+            kind: "strong",
+            digest: { demo: digest.demo, finishedAt: { not: null }, preferences: { equals: settings.searchPreferences! } },
+          } } },
+        ],
+      },
+      orderBy: [{ updatedAt: "asc" }, { id: "asc" }],
+      select: identityFields,
+    }),
+  ]);
+  const queue = [...newMatches, ...backlog];
+  if (!queue.length) return idle;
+  const best = (await unseenDigestPostings(queue, queue.map(({ id }) => id))).slice(0, settings.agentMaxDrafts);
+  if (!best.length) return idle;
+  let drafted = 0;
+  let failed = 0;
+  for (const { id: candidateId } of best) {
+    if (context.signal.aborted) break;
+    await prisma.digestItem.upsert({
+      where: { digestId_candidateId: { digestId: digest.id, candidateId } },
+      create: { digestId: digest.id, candidateId, kind: "strong" },
+      update: {},
+    });
+    try {
+      // Pin the endpoint and profile for all calls in this package.
+      await jobSourceContext.run(
+        { ...source, config, profile, rejectAiRedirects: true },
+        () => draftCandidate(candidateId, context, { partOfDigest: true }),
+      );
+      drafted++;
+    } catch {
+      if (!context.signal.aborted) failed++;
+    }
+  }
+  return {
+    drafted,
+    summary: ` Prepared ${drafted} ${drafted === 1 ? "application draft" : "application drafts"}; ${failed} preparation failures. Automatic preparation uses complete postings only.`,
+  };
+}
+
 export async function runDailyDigest(
   manual: boolean,
   context: JobContext,
@@ -235,10 +319,11 @@ export async function runDailyDigest(
       data: { kind: "stretch" },
     });
     stretch = stretches.length;
+    const preparation = await prepareStrongMatches(digest, settings, context, profile);
     const failedSources = found.sources.filter(
       (s) => s.status === "failed" || s.status === "partial",
     ).length;
-    const message = `${strong} strong ${strong === 1 ? "match" : "matches"}, ${stretch} stretch ${stretch === 1 ? "role" : "roles"}. ${scored} scored; ${Math.max(0, fresh.length - toScore.length)} deferred by the scoring limit; ${failures} scoring failures; ${failedSources} ${failedSources === 1 ? "source needs" : "sources need"} attention.${context.signal.aborted ? " Run interrupted; completed results are preserved." : ""}`;
+    const message = `${strong} strong ${strong === 1 ? "match" : "matches"}, ${stretch} stretch ${stretch === 1 ? "role" : "roles"}. ${scored} scored; ${Math.max(0, fresh.length - toScore.length)} deferred by the scoring limit; ${failures} scoring failures; ${failedSources} ${failedSources === 1 ? "source needs" : "sources need"} attention.${preparation.summary}${context.signal.aborted ? " Run interrupted; completed results are preserved." : ""}`;
     await prisma.dailyDigest.update({
       where: { id: digest.id },
       data: { finishedAt: new Date(), message },
@@ -249,7 +334,7 @@ export async function runDailyDigest(
       fresh: fresh.length,
       skipped: found.postings.length - fresh.length,
       scored,
-      drafted: 0,
+      drafted: preparation.drafted,
       message,
     };
   } catch (e) {

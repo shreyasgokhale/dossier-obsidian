@@ -68,7 +68,6 @@ const globalForAgent = globalThis as unknown as { agentTimer?: ReturnType<typeof
 /** Starts the timer, once per process (dev reloads keep the one they have). */
 export function startAgentSchedule(): void {
   if (globalForAgent.agentTimer) return;
-  void resetInterruptedDrafts().catch((error: unknown) => logServerError("job agent", error));
   const check = () => void startDueRun().catch((error: unknown) => logServerError("job agent schedule", error));
   globalForAgent.agentTimer = setInterval(check, EVERY_MS);
   // Don't keep the process alive just for this.

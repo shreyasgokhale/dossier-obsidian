@@ -5,6 +5,29 @@ Branch: `feat/daily-job-digest`; changes remain on the feature branch.
 No merge or private-data deployment. Synthetic Nimbus deployment recorded below.
 Starting upstream: `4fd532973be9ecbae43b55de5e0c3e681f07e493` (Dossier 1.8.1).
 
+## Prepared digest and recovery verification — 2026-11-18
+
+Automatic preparation reuses the existing document writer for complete strong
+matches, under the configured per-run limit. It requires an explicitly allowed
+local AI endpoint. Packages can be reviewed and kept as unsent drafts. Digest
+Markdown output is limited to the designated service-owned projection. See
+[daily job digest](daily-job-digest.md) for setup.
+
+Next.js and its ESLint configuration were updated to 16.4.5. Immutable install,
+lint, production build and the full Vitest suite passed (1,818 tests passed and
+29 optional skips, with unchanged coverage thresholds). A standalone process
+served an isolated PostgreSQL 18.6 database. A native dump plus an application
+notes snapshot restored to fresh isolated storage. The browser signed in and
+opened the saved record before backup, after restore and after a restart. API
+readiness took 2.6 seconds on restore startup and 2.3 seconds on restart.
+
+The workspace build included the preserved prior local changes. Build the exact
+reviewed release for the target architecture before transfer. Nimbus SSH access
+is unavailable from this devcontainer. The next live step is collecting guest
+process and database evidence through an approved SSH route or console, then
+verifying the deployment and rollback with co-tenants accounted for. Nimbus
+reboot timing, off-home recovery and outage notification remain unverified.
+
 ## Nimbus fresh deployment — 2026-11-02
 
 Explicit fresh setup authorized on `feat/daily-job-digest` at feature revision

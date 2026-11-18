@@ -11,7 +11,7 @@ import { toast, toastResult } from "@/components/toast";
 import { useJob } from "@/hooks/use-job";
 import type { DigestView } from "@/lib/digest/view";
 import { SOURCE_INFO } from "@/lib/job-search/sources";
-import { dismissAgentCandidate, runAgentNow } from "../agent/actions";
+import { approveAgentDraft, dismissAgentCandidate, runAgentNow } from "../agent/actions";
 import { savePostingForLater } from "../jobs/actions";
 import { useStartApplication } from "../jobs/use-start-application";
 export function DigestScreen({
@@ -233,16 +233,43 @@ export function DigestScreen({
                         source={item.posting.source}
                         url={item.posting.url}
                       />
+                      {item.preparation.error && (
+                        <p className="text-sm text-warning">Preparation failed. {item.preparation.error}</p>
+                      )}
                       <div className="flex flex-wrap gap-3 border-t border-line pt-3">
-                        <Button
-                          size="sm"
-                          disabled={pending || application.starting !== null}
-                          onClick={() =>
-                            void application.start(item.posting, item.id)
-                          }
-                        >
-                          Start application
-                        </Button>
+                        {item.preparation.applicationId ? (
+                          <>
+                            <Link
+                              className={buttonClassName("primary", "sm", "hover:text-on-primary")}
+                              href={`/applications/${item.preparation.applicationId}`}
+                            >
+                              Review CV and cover letter
+                            </Link>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={pending}
+                              onClick={() =>
+                                start(async () => {
+                                  const result = toastResult(await approveAgentDraft({ candidateId: item.id }));
+                                  if (result.ok) router.push(`/applications/${result.data.applicationId}`);
+                                })
+                              }
+                            >
+                              Keep as application draft
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            size="sm"
+                            disabled={pending || application.starting !== null || item.preparation.status === "DRAFTING"}
+                            onClick={() =>
+                              void application.start(item.posting, item.id)
+                            }
+                          >
+                            {item.preparation.status === "DRAFTING" ? "Preparing CV and cover letter…" : "Start application"}
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           variant="secondary"
@@ -274,25 +301,27 @@ export function DigestScreen({
                             </span>
                           </a>
                         )}
-                        <Button
-                          size="sm"
-                          variant="danger-text"
-                          disabled={pending}
-                          onClick={() =>
-                            start(async () => {
-                              if (
-                                toastResult(
-                                  await dismissAgentCandidate({
-                                    candidateId: item.id,
-                                  }),
-                                ).ok
-                              )
-                                router.refresh();
-                            })
-                          }
-                        >
-                          Dismiss
-                        </Button>
+                        {!item.preparation.applicationId && item.preparation.status !== "DRAFTING" && (
+                          <Button
+                            size="sm"
+                            variant="danger-text"
+                            disabled={pending}
+                            onClick={() =>
+                              start(async () => {
+                                if (
+                                  toastResult(
+                                    await dismissAgentCandidate({
+                                      candidateId: item.id,
+                                    }),
+                                  ).ok
+                                )
+                                  router.refresh();
+                              })
+                            }
+                          >
+                            Dismiss
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   ))}

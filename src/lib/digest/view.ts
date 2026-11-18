@@ -22,7 +22,18 @@ export async function loadDigestView(id?: string) {
         orderBy: { startedAt: "desc" },
         include: { items: { include: { candidate: true } } },
       });
-  const found = digest?.items.map((i) => foundFromPosting(i.candidate)) ?? [];
+  const items = digest?.items ?? [];
+  const itemIds = new Set(items.map((item) => item.candidateId));
+  const outstanding = !id && digest ? await prisma.agentCandidate.findMany({
+    where: {
+      id: { notIn: [...itemIds] },
+      status: "DRAFTED",
+      application: { awaitingReview: true, archivedAt: null },
+      digestItems: { some: { digest: { demo: digest.demo } } },
+    },
+  }) : [];
+  const visibleItems = [...items, ...outstanding.map((candidate) => ({ kind: "strong", candidate }))];
+  const found = visibleItems.map((i) => foundFromPosting(i.candidate));
   const states = await postingStates(found);
   const [stored, applications] = await Promise.all([
     prisma.posting.findMany({
@@ -31,6 +42,7 @@ export async function loadDigestView(id?: string) {
       },
     }),
     prisma.application.findMany({
+      where: { awaitingReview: false },
       select: { id: true, company: true, role: true, postingUrl: true },
     }),
   ]);
@@ -67,7 +79,7 @@ export async function loadDigestView(id?: string) {
           demo: digest.demo,
           message: digest.message,
           sources: digest.sources as SourceReport[],
-          items: digest.items
+          items: visibleItems
             .map((i) => ({
               id: i.candidate.id,
               kind: i.kind,
@@ -75,6 +87,11 @@ export async function loadDigestView(id?: string) {
               score: i.candidate.score,
               reasons: stringsOf(i.candidate.reasons),
               gaps: stringsOf(i.candidate.redFlags),
+              preparation: {
+                status: i.candidate.status,
+                error: i.candidate.error,
+                applicationId: i.candidate.status === "DRAFTED" ? i.candidate.applicationId : null,
+              },
               state: {
                 ...states.get(postingKey(i.candidate))!,
                 saved:
