@@ -30,6 +30,7 @@ export const loadApplication = cache(async (id: string) => {
         select: { digestItems: { orderBy: { digest: { startedAt: "desc" } }, take: 1, select: { digestId: true } } },
       },
       notes: true,
+      evidence: { select: { id: true, kind: true, occurredAt: true, createdAt: true } },
       events: { select: { id: true, to: true, at: true } },
       facts: { select: { id: true, text: true }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] },
     },

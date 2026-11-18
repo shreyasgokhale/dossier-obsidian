@@ -114,6 +114,7 @@ export type ApplicationViewProps = {
     /** A job agent draft not approved yet (#195): it isn't in Applications. */
     awaitingReview?: boolean;
     reviewDigestId?: string;
+    requireSubmission?: boolean;
     /** The next interview, while in Interview (E9-9). */
     nextInterviewAt: Date | null;
   };
@@ -629,7 +630,14 @@ export function ApplicationView({
                 From the job agent · waiting for review
               </Link>
             )}
-            <StatusControl id={application.id} status={application.status} interviewAt={application.nextInterviewAt} timeZone={timeZone} />
+            <StatusControl
+              id={application.id}
+              status={application.status}
+              interviewAt={application.nextInterviewAt}
+              timeZone={timeZone}
+              submissionHref={application.awaitingReview ? undefined : `/applications/${encodeURIComponent(application.id)}/submission`}
+              requireSubmission={application.requireSubmission}
+            />
             {(resume || letter) && (
               // The document on screen; from the Job posting tab, the resume (E8-8).
               <DownloadPdfButton

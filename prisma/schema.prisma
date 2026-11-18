@@ -452,6 +452,8 @@ model Application {
   startup             Startup?
   /// Mail sent and received about it through Gmail (E15-3).
   emails              EmailMessage[]
+  submission          ApplicationSubmission?
+  evidence            ApplicationEvidence[]
   events              StatusEvent[]
   documents           Document[]
   messages            ChatMessage[]
@@ -465,6 +467,42 @@ model Application {
 
   @@index([status])
   @@index([updatedAt])
+}
+
+/// The owner-confirmed submission, with the exact files supplied for it.
+model ApplicationSubmission {
+  applicationId String      @id
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  submittedAt   DateTime
+  company       String
+  role          String
+  details       String
+  submittedText String      @default("")
+  files         Json
+}
+
+enum ApplicationEvidenceKind {
+  REPLY
+  INTERVIEW_NOTE
+  RECORDING
+  TRANSCRIPT
+  EMPLOYER_FEEDBACK
+}
+
+/// An owner-supplied follow-up item. Corrections append to the original.
+model ApplicationEvidence {
+  id            String                  @id @default(cuid())
+  applicationId String
+  application   Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  kind          ApplicationEvidenceKind
+  text          String
+  fileName      String?
+  fileContent   String?
+  correctsId    String?
+  occurredAt    DateTime?
+  createdAt     DateTime                @default(now())
+
+  @@index([applicationId, createdAt])
 }
 
 /// One status change. Keeps the application's furthestStage and sentAt from

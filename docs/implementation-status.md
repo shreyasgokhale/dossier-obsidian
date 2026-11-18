@@ -581,3 +581,26 @@ production artifacts against the handoff. No merge or deployment was performed.
 If the original host later reports YN0018 again, preserve
 its failing package response/cache archive and sanitized registry configuration
 for comparison with this audit before changing any dependency pin.
+
+## Manual submission and follow-up evidence — 2026-11-18
+
+Application pages support an explicit manual submission record with the timestamp,
+employer and role, exact uploaded files, submitted text, and optional receipt.
+An identical retry returns the saved result. A different repeat is reported as a
+conflict. Keeping a prepared digest draft leaves it unsent.
+
+Follow-up evidence accepts owner-supplied replies, interview notes, small
+recordings, transcripts and employer feedback. Corrections link to earlier
+entries and retain the originals. The application activity links to dated
+evidence. Backup format 8 includes both records and accepts older files.
+
+Uploads currently allow eight submission files totaling 5 MiB and individual
+recordings up to 5 MiB. Installations with JSON exports over the browser's
+10 MiB import limit use PostgreSQL backup and restore for operational recovery.
+The Gmail send flow retains its existing behavior. Exact Gmail attachments,
+full-length recording upload, interview analysis and broader career-evidence
+selection remain open.
+
+The implementation uses synthetic records. Continue live verification from the
+Nimbus guest console. Host and guest access inputs are absent from this
+devcontainer. Preserve guest/container/DB and co-tenant evidence before a reset.

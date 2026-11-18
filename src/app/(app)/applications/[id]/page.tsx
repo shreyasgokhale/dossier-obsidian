@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { cache } from "react";
 
 import { activityTimeline } from "@/lib/activity";
@@ -80,7 +81,15 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
 
   return (
     <ApplicationView
-      tracking={<TrackingFields id={id} initial={{ applicationDate: application.applicationDate?.toISOString().slice(0, 10) ?? "", followUpDate: application.followUpDate?.toISOString().slice(0, 10) ?? "", deadline: application.deadline?.toISOString().slice(0, 10) ?? "", nextAction: application.nextAction, company: application.company, role: application.role, postingUrl: application.postingUrl, location: application.location }} />}
+      tracking={<>
+        {!application.awaitingReview && (
+          <div className="flex flex-wrap gap-4 border-b border-line px-10 py-3">
+            {status !== "DRAFT" && <Link href={`/applications/${encodeURIComponent(id)}/submission`} className="text-sm underline">Submission record</Link>}
+            <Link href={`/applications/${encodeURIComponent(id)}/evidence`} className="text-sm underline">Follow-up evidence</Link>
+          </div>
+        )}
+        <TrackingFields id={id} initial={{ applicationDate: application.applicationDate?.toISOString().slice(0, 10) ?? "", followUpDate: application.followUpDate?.toISOString().slice(0, 10) ?? "", deadline: application.deadline?.toISOString().slice(0, 10) ?? "", nextAction: application.nextAction, company: application.company, role: application.role, postingUrl: application.postingUrl, location: application.location }} />
+      </>}
       application={{
         id,
         title,
@@ -94,6 +103,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
         archived: application.archivedAt !== null,
         awaitingReview: application.awaitingReview,
         reviewDigestId: application.agentCandidate?.digestItems[0]?.digestId,
+        requireSubmission: !application.sentAt && Boolean(application.agentCandidate?.digestItems.length),
         nextInterviewAt,
       }}
       timeZone={timeZone}
@@ -106,7 +116,7 @@ export default async function ApplicationPage({ params, searchParams }: PageProp
       match={match}
       requirements={extracted?.requirements ?? []}
       facts={application.facts}
-      activity={activityTimeline({ notes: application.notes, events: application.events, createdAt: application.createdAt })}
+      activity={activityTimeline({ notes: application.notes, events: application.events, evidence: application.evidence, createdAt: application.createdAt })}
       meta={metaLine(application)}
       resume={resume}
       letter={letter}

@@ -63,7 +63,7 @@ import { prisma } from "@/lib/prisma";
 ```
 
 JSON columns (document units, the posting's extracted details, the match, chat edits) are validated with the zod schemas in `src/lib/application-data.ts`.
-Change an application's status only through `setStatus` in `src/lib/status-actions.ts` (or `changeStatus()` in client code, which adds the Undo toast), so the funnel figures stay consistent.
+Use `setStatus` in `src/lib/status-actions.ts` for status controls (`changeStatus()` in client code adds the Undo toast). Workflows that already have a database transaction, such as Markdown imports and submission recording, use `applyStatusChangeTx` to keep status and history consistent.
 
 ### Seed data
 
@@ -189,7 +189,7 @@ With "Nightly backups" on (the default), the app writes the same export to `back
 
 ### Import size limit
 
-Import files are capped at 10 MB, roughly 500 applications. The limit comes from Next.js, which buffers request bodies up to [`experimental.proxyClientMaxBodySize`](https://nextjs.org/docs/app/api-reference/config/next-config-js/proxyClientMaxBodySize) (10 MB by default) because `src/proxy.ts` runs on every request; larger bodies are cut off, so the app refuses them up front. To accept bigger files, raise that option in `next.config.ts` and `IMPORT_MAX_BYTES` in `src/lib/import-limits.ts`. Behind a reverse proxy, its own limit applies as well: with nginx, raise `client_max_body_size` (see [Troubleshooting](https://github.com/AienTech/dossier/wiki/Troubleshooting) in the wiki).
+Browser JSON imports are capped at 10 MiB. Submitted files and interview recordings increase JSON export size, so use a PostgreSQL backup and restore for operational recovery, including installations whose JSON exports exceed that cap. The limit comes from Next.js, which buffers request bodies up to [`experimental.proxyClientMaxBodySize`](https://nextjs.org/docs/app/api-reference/config/next-config-js/proxyClientMaxBodySize) (10 MB by default) because `src/proxy.ts` runs on every request; larger bodies are cut off, so the app refuses them up front. To accept bigger files, raise that option in `next.config.ts` and `IMPORT_MAX_BYTES` in `src/lib/import-limits.ts`. Behind a reverse proxy, its own limit applies as well: with nginx, raise `client_max_body_size` (see [Troubleshooting](https://github.com/AienTech/dossier/wiki/Troubleshooting) in the wiki).
 
 ## Job agent
 

@@ -148,11 +148,17 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
       const themeIds = new Set((await tx.theme.findMany({ select: { id: true } })).map((theme) => theme.id));
       await tx.application.createMany({
         data: applications.map((application) => ({
-          ...omit(application, "events", "documents", "messages", "notes", "facts", "userNote"),
+          ...omit(application, "events", "documents", "messages", "notes", "facts", "userNote", "submission", "evidence"),
           extracted: json(application.extracted),
           match: json(application.match),
           aiProvenance: json(application.aiProvenance),
         })),
+      });
+      await tx.applicationEvidence.createMany({
+        data: applications.flatMap(({ id, evidence }) => (evidence ?? []).map((entry) => ({ ...entry, applicationId: id }))),
+      });
+      await tx.applicationSubmission.createMany({
+        data: applications.flatMap(({ id, submission }) => submission ? [{ ...submission, applicationId: id }] : []),
       });
       await tx.statusEvent.createMany({
         data: applications.flatMap((application) => application.events.map((event) => ({ ...event, applicationId: application.id }))),

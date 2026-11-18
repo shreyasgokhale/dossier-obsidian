@@ -3,9 +3,11 @@ import "server-only";
 import { z } from "zod";
 
 import { profileSchema } from "@/lib/markdown/profile";
+import { submittedFileName, submittedFilesSchema } from "@/lib/submission-data";
 import type { PrismaClient } from "@/generated/prisma/client";
 import {
   AgentCandidateStatus,
+  ApplicationEvidenceKind,
   ApplicationOrigin,
   ApplicationStatus,
   ChatRole,
@@ -41,10 +43,10 @@ import { appVersion } from "@/lib/version";
 // behind: they belong to the server or the mailbox, not the user's data.
 
 export const EXPORT_FORMAT = "dossier-export";
-/** Bump when the file's shape changes; imports refuse versions they don't know. 2 added Find jobs' postings and keys (E14-9), 3 projects (PRO-13) and the job agent (E16), 4 facts (PRO-14, APP-15), 5 publications (#218), the profile photo's theme and application options (#224) and Startups (#222), 6 the line about a role's company (#257), 7 daily digests and preference synchronization. */
-export const EXPORT_SCHEMA_VERSION = 7;
+/** Bump when the file's shape changes; imports refuse versions they don't know. 2 added Find jobs' postings and keys (E14-9), 3 projects (PRO-13) and the job agent (E16), 4 facts (PRO-14, APP-15), 5 publications (#218), the profile photo's theme and application options (#224) and Startups (#222), 6 the line about a role's company (#257), 7 daily digests and preference synchronization, 8 submission and follow-up evidence. */
+export const EXPORT_SCHEMA_VERSION = 8;
 /** The versions imports can read. */
-export const EXPORT_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7];
+export const EXPORT_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
 
 /** The setting that holds the encrypted API key, which only this server can read. */
 const API_KEY_SETTING = "apiKeyEnc";
@@ -186,6 +188,35 @@ const chatMessage = z.object({
   createdAt: date,
 });
 const note = z.object({ id: text, body: text, createdAt: date, updatedAt: date });
+const submission = z.object({
+  submittedAt: date,
+  company: text,
+  role: text,
+  details: text,
+  submittedText: text.default(""),
+  files: submittedFilesSchema,
+});
+const applicationEvidence = z.object({
+  id: text,
+  kind: z.enum(ApplicationEvidenceKind),
+  text,
+  fileName: submittedFileName.nullable(),
+  fileContent: z.base64().nullable(),
+  correctsId: text.nullable(),
+  occurredAt: optionalDate.default(null),
+  createdAt: date,
+});
+const applicationEvidenceHistory = z.array(applicationEvidence).superRefine((entries, context) => {
+  const seen = new Map<string, (typeof entries)[number]>();
+  for (const [index, entry] of entries.entries()) {
+    const original = entry.correctsId ? seen.get(entry.correctsId) : undefined;
+    if (seen.has(entry.id) ||
+        (entry.correctsId && (!original || original.kind !== entry.kind || original.createdAt > entry.createdAt))) {
+      context.addIssue({ code: "custom", path: [index, "correctsId"], message: "Invalid follow-up evidence history." });
+    }
+    seen.set(entry.id, entry);
+  }
+});
 const application = z.object({
   id: text,
   title: text,
@@ -225,6 +256,8 @@ const application = z.object({
   createdAt: date,
   updatedAt: date,
   events: z.array(statusEvent),
+  submission: submission.nullable().optional(),
+  evidence: applicationEvidenceHistory.optional(),
   documents: z.array(document),
   messages: z.array(chatMessage),
   notes: z.array(note),
@@ -339,7 +372,7 @@ export const exportSchema = z.object({
   searchPreferenceSync: z.array(z.object({ id: text, snapshot: z.unknown().nullable(), fileHash: text.nullable(), conflict: z.unknown().nullable(), error: text.nullable(), updatedAt: date })).default([]),
   markdown: markdownExport.optional(),
   format: z.literal(EXPORT_FORMAT),
-  schemaVersion: z.literal([1, 2, 3, 4, 5, 6, 7]),
+  schemaVersion: z.literal([1, 2, 3, 4, 5, 6, 7, 8]),
   appVersion: text,
   exportedAt: date,
   profile: z.object({
@@ -410,6 +443,8 @@ export async function buildExport(
         // The Gmail thread belongs to the mailbox, not the data (E15-2).
         omit: { emailThreadId: true, interviewEventId: true, interviewCalendarId: true },
         include: {
+          evidence: { omit: { applicationId: true }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+          submission: { omit: { applicationId: true } },
           events: { omit: { applicationId: true }, orderBy: { at: "asc" } },
           documents: {
             omit: { applicationId: true },
@@ -466,7 +501,11 @@ export async function buildExport(
       settings: settings.filter((setting) => !SECRET_SETTINGS.includes(setting.key) && !INSTALL_SETTINGS.includes(setting.key)),
       ...(apiKey ? { apiKey } : {}),
       ...(Object.keys(jobSourceKeys).length > 0 ? { jobSourceKeys } : {}),
-      applications: applications.map((item) => ({ ...item, aiProvenance: application.shape.aiProvenance.parse(item.aiProvenance) })),
+      applications: applications.map(({ submission: receipt, ...item }) => ({
+        ...item,
+        aiProvenance: application.shape.aiProvenance.parse(item.aiProvenance),
+        submission: receipt ? { ...receipt, files: submittedFilesSchema.parse(receipt.files) } : null,
+      })),
       postings,
       searches,
       agentCandidates,

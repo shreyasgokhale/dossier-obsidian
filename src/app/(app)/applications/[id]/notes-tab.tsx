@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useId, useState, useTransition } from "react";
 
 import { toast } from "@/components/toast";
 import { Button } from "@/components/ui/button";
 import { StatusDot } from "@/components/ui/status-dot";
+import { EVIDENCE_LABELS } from "@/lib/application-evidence-data";
 import type { ActivityEntry } from "@/lib/activity";
 import { statusInfo } from "@/lib/status";
 
@@ -155,7 +157,13 @@ export function NotesTab({ applicationId, activity }: { applicationId: string; a
                 </div>
               ) : (
                 <p className="flex min-w-0 flex-1 flex-wrap justify-between gap-x-3 text-sm">
-                  <span>{entry.kind === "status" ? `Moved to ${statusInfo(entry.status).label}` : "Created"}</span>
+                  {entry.kind === "evidence" ? (
+                    <Link className="underline" href={`/applications/${encodeURIComponent(applicationId)}/evidence#evidence-${encodeURIComponent(entry.id)}`}>
+                      {EVIDENCE_LABELS[entry.evidenceKind]}
+                    </Link>
+                  ) : (
+                    <span>{entry.kind === "status" ? `Moved to ${statusInfo(entry.status).label}` : "Created"}</span>
+                  )}
                   <span className="text-label text-muted">{entry.date}</span>
                 </p>
               )}

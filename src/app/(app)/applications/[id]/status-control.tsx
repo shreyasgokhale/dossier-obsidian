@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useOptimistic, useRef, useState, useTransition } from "react";
 
 import { changeStatus } from "@/components/change-status";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClassName } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,11 +31,15 @@ export function StatusControl({
   status,
   interviewAt = null,
   timeZone,
+  submissionHref,
+  requireSubmission = false,
 }: {
   id: string;
   status: ApplicationStatus;
   interviewAt?: Date | null;
   timeZone?: string;
+  submissionHref?: string;
+  requireSubmission?: boolean;
 }) {
   const [shown, show] = useOptimistic(status);
   const [, startTransition] = useTransition();
@@ -78,7 +83,11 @@ export function StatusControl({
           <DropdownMenuLabel>Move this application to</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={shown} onValueChange={(value) => move(value as ApplicationStatus)}>
             {STATUSES.map((entry) => (
-              <DropdownMenuRadioItem key={entry.value} value={entry.value}>
+              <DropdownMenuRadioItem
+                key={entry.value}
+                value={entry.value}
+                disabled={requireSubmission && entry.value !== ApplicationStatus.DRAFT && entry.value !== ApplicationStatus.DECLINED}
+              >
                 <StatusDot status={entry.value} />
                 {entry.label}
               </DropdownMenuRadioItem>
@@ -96,7 +105,10 @@ export function StatusControl({
           onOpenChange={(open) => setInterview(open ? "edit" : null)}
         />
       )}
-      {shown === ApplicationStatus.DRAFT && <Button onClick={() => move(ApplicationStatus.SENT)}>Mark as sent</Button>}
+      {shown === ApplicationStatus.DRAFT && (
+        submissionHref ? <Link href={submissionHref} className={buttonClassName()}>Record submission</Link>
+          : !requireSubmission && <Button onClick={() => move(ApplicationStatus.SENT)}>Mark as sent</Button>
+      )}
     </>
   );
 }
