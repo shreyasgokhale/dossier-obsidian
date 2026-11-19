@@ -4,7 +4,7 @@ import type { PaperSize } from "@/generated/prisma/enums";
 import { cn } from "@/lib/cn";
 import { hasRightToLeft, type TextDirection } from "@/lib/document-language";
 import { CONTACT_SEPARATOR } from "@/lib/resume-content";
-import { PAPER_SIZES, SIDEBAR, type ResolvedTheme } from "@/lib/themes";
+import { PAPER_SIZES, SIDEBAR, portfolioPoints, type ResolvedTheme } from "@/lib/themes";
 
 import styles from "./document.module.css";
 
@@ -34,6 +34,7 @@ function themeStyle(theme: ResolvedTheme, paper: PaperSize): CSSProperties {
     "--heading-padding": heading.padding,
     "--sidebar-width": SIDEBAR.width,
     "--sidebar-gap": SIDEBAR.gap,
+    ...(theme.portfolio && { "--pt": `calc(var(--u) * ${portfolioPoints(1)})` }),
     ...(theme.banner && { "--on-accent": theme.onAccent }),
   } as CSSProperties;
 }
@@ -41,6 +42,7 @@ function themeStyle(theme: ResolvedTheme, paper: PaperSize): CSSProperties {
 /** The theme's structure as classes on the page: layout, header, dates and section titles. */
 function themeClasses(theme: ResolvedTheme) {
   return cn(
+    theme.portfolio && styles.portfolio,
     theme.split && styles.split,
     theme.sidebarEnd && styles.sidebarEnd,
     theme.tintedSidebar && styles.tintedSidebar,
@@ -108,10 +110,10 @@ export const plainUnit: UnitRenderer = ({ id, className, head, children }) => (
 );
 
 /** A section with a themed title. */
-export function DocumentSection({ title, children }: { title: string; children: ReactNode }) {
+export function DocumentSection({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className={styles.section}>
-      <h2 className={styles.sectionTitle}>{title}</h2>
+      {title && <h2 className={styles.sectionTitle}>{title}</h2>}
       {children}
     </section>
   );

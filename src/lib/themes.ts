@@ -48,6 +48,8 @@ export const THEME_STYLE_DEFAULTS = {
 } satisfies Partial<ThemeData>;
 type StyleField = keyof typeof THEME_STYLE_DEFAULTS;
 
+export const PORTFOLIO_THEME_ID = "portfolio";
+
 /** The built-in themes, in the order the theme picker shows them (RES-2). */
 export const BUILT_IN_THEMES: ThemeData[] = (
   [
@@ -63,6 +65,7 @@ export const BUILT_IN_THEMES: ThemeData[] = (
     { id: "folio", name: "Folio", headFont: "PLAYFAIR", bodyFont: "LORA", accent: "#1d1c1a", layout: "SIDE_HEADINGS", align: "LEFT", headingStyle: "PLAIN", density: "AIRY", photoShape: "ROUNDED", photoPosition: "HEADER_START" },
     { id: "console", name: "Console", headFont: "JETBRAINS_MONO", bodyFont: "WORK_SANS", accent: "#4a5563", layout: "SPLIT", align: "LEFT", headingStyle: "BAND", density: "COMPACT", sidebarStyle: "TINTED", photoShape: "SQUARE", photoPosition: "SIDEBAR" },
     { id: "atlas", name: "Atlas", headFont: "LIBRE_CASLON", bodyFont: "INTER", accent: "#a14a1f", layout: "SINGLE", align: "CENTER", headingStyle: "CAPS", density: "REGULAR", headerStyle: "BANNER", dateStyle: "TIMELINE", photoPosition: "ABOVE_NAME" },
+    { id: PORTFOLIO_THEME_ID, name: "Portfolio", headFont: "INTER", bodyFont: "INTER", accent: "#2a7ab5", layout: "SINGLE", align: "LEFT", headingStyle: "RULE", density: "COMPACT" },
   ] satisfies (Omit<ThemeData, "builtIn" | StyleField> & Partial<Pick<ThemeData, StyleField>>)[]
 ).map((theme) => ({ ...THEME_STYLE_DEFAULTS, ...theme, builtIn: true }));
 
@@ -249,14 +252,29 @@ function documentFamily(font: ThemeFont): string {
   return `var(--script-fonts), ${serif ? "var(--typeface-greek-serif)" : "var(--typeface-greek-sans)"}, ${family}`;
 }
 
+/** Measurements from the website’s print stylesheet, expressed in A4 page units. */
+export const portfolioPoints = (pt: number) => (pt * 25.4 * PAGE_WIDTH) / (72 * PAPER_SIZES.A4.widthMm);
+
+const portfolioDensity = {
+  label: "Portfolio",
+  paddingY: portfolioPoints(28.8),
+  paddingX: portfolioPoints(36),
+  gap: portfolioPoints(4),
+  fontSize: portfolioPoints(9.5),
+  lineHeight: 1.35,
+  itemGap: 0,
+};
+
 /**
  * A theme's settings resolved for rendering. `layout` overrides the theme's
  * own, e.g. a tailored resume in a single column (E5-1 decision).
  */
 export function resolveTheme(theme: ThemeData, layout: ThemeLayout = theme.layout) {
+  const portfolio = theme.id === PORTFOLIO_THEME_ID;
   const split = hasSidebar(layout);
   const serifHeading = THEME_FONTS[theme.headFont].serif;
   return {
+    portfolio,
     /** A sidebar layout, the sidebar on either side. */
     split,
     sidebarEnd: layout === ThemeLayout.SPLIT_END,
@@ -277,7 +295,7 @@ export function resolveTheme(theme: ThemeData, layout: ThemeLayout = theme.layou
     /** Text on the accent, e.g. in a banner: white, or ink when that reads better. */
     onAccent: contrastRatio(theme.accent, "#ffffff") >= contrastRatio(theme.accent, INK) ? "#ffffff" : INK,
     heading: HEADING_STYLES[theme.headingStyle],
-    density: DENSITIES[theme.density],
+    density: portfolio ? portfolioDensity : DENSITIES[theme.density],
     name: serifHeading ? { size: 30, weight: 500 } : { size: 25, weight: 600 },
   };
 }
@@ -295,7 +313,7 @@ export function unitsToMm(units: number, paper: PaperSize): number {
  */
 export function printCss(theme: ThemeData, paper: PaperSize): string {
   const { widthMm, heightMm } = PAPER_SIZES[paper];
-  const { paddingY, paddingX } = DENSITIES[theme.density];
+  const { paddingY, paddingX } = resolveTheme(theme).density;
   return [
     `@page { size: ${widthMm}mm ${heightMm}mm; margin: ${unitsToMm(paddingY, paper)}mm ${unitsToMm(paddingX, paper)}mm; }`,
     `:root { --u: ${widthMm / PAGE_WIDTH}mm; }`,

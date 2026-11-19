@@ -48,6 +48,8 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
   const content = resumeContent(profile, options, labels);
   const { lang, dir } = documentLanguage(language, sampleText(content));
   const { shape, position } = resolved.photo;
+  const portfolio = resolved.portfolio;
+  const locations = portfolio ? new Map(profile.experience.map(({ id, location }) => [id, location])) : null;
   const photo = (size: "header" | "sidebar", className?: string) =>
     content.photo && <ResumePhoto key="photo" src={content.photo} name={content.name} shape={shape} size={size} className={className} />;
 
@@ -78,18 +80,20 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
 
   const main = [
     content.summary && (
-      <DocumentSection key="summary" title={labels.profile}>
+      <DocumentSection key="summary" title={portfolio ? undefined : labels.profile}>
         {renderUnit({ id: "summary", children: <p className={styles.summary}>{content.summary}</p> })}
       </DocumentSection>
     ),
     content.experience.length > 0 && (
-      <DocumentSection key="experience" title={labels.experience}>
+      <DocumentSection key="experience" title={portfolio && labels.locale.split("-")[0] === "en" ? "Work Experience" : labels.experience}>
         {content.experience.map((role) => (
           <Fragment key={role.id}>
             {renderUnit({
               id: `experience:${role.id}`,
               className: styles.entry,
-              head: <EntryHead title={role.role} at={role.company} dates={role.dates} timeline={resolved.timeline} />,
+              head: portfolio
+                ? <PortfolioEntryHead title={role.company} subtitle={role.role} location={locations?.get(role.id)} dates={role.dates} />
+                : <EntryHead title={role.role} at={role.company} dates={role.dates} timeline={resolved.timeline} />,
               children: (
                 <>
                   {role.descriptor && <p className={styles.descriptor}>{role.descriptor}</p>}
@@ -102,7 +106,7 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
                   )}
                   {role.skills.length > 0 && (
                     <p className={styles.entrySkills}>
-                      <span className={styles.accent}>{`${labels.skills} · `}</span>
+                      {!portfolio && <span className={styles.accent}>{`${labels.skills} · `}</span>}
                       {role.skills.join(", ")}
                     </p>
                   )}
@@ -139,7 +143,7 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
                   )}
                   {project.skills.length > 0 && (
                     <p className={styles.entrySkills}>
-                      <span className={styles.accent}>{`${labels.skills} · `}</span>
+                      {!portfolio && <span className={styles.accent}>{`${labels.skills} · `}</span>}
                       {project.skills.join(", ")}
                     </p>
                   )}
@@ -157,7 +161,9 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
             {renderUnit({
               id: `education:${entry.id}`,
               className: styles.entry,
-              head: <EntryHead title={entry.degree} at={entry.school} dates={entry.dates} timeline={resolved.timeline} />,
+              head: portfolio
+                ? <PortfolioEntryHead title={entry.school} subtitle={entry.degree} dates={entry.dates} />
+                : <EntryHead title={entry.degree} at={entry.school} dates={entry.dates} timeline={resolved.timeline} />,
               children: entry.notes && <p className={styles.muted}>{entry.notes}</p>,
             })}
           </Fragment>
@@ -213,11 +219,15 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
   // Reading order matches what you see: the sidebar comes first in sidebar
   // layouts (and keeps its column even when empty) unless it's at the end of
   // the line, and its sections follow the main ones in a single column.
-  const columns = !resolved.split
-    ? [main, sidebar].filter((sections) => sections.length > 0)
-    : resolved.sidebarEnd
-      ? [main, sidebar]
-      : [sidebar, main];
+  const sections = [...main, ...sidebar];
+  const portfolioOrder = ["summary", "skills", "experience", "education", "languages", "projects", "publications", "references"];
+  const columns = portfolio
+    ? [portfolioOrder.flatMap((key) => sections.filter((section) => section && section.key === key))]
+    : !resolved.split
+      ? [main, sidebar].filter((column) => column.length > 0)
+      : resolved.sidebarEnd
+        ? [main, sidebar]
+        : [sidebar, main];
   // A tinted sidebar is drawn as a panel, unless there's nothing in it.
   const panel = resolved.tintedSidebar && sidebar.length > 0 ? sidebar : null;
 
@@ -269,6 +279,22 @@ function ResumePhoto({ src, name, shape, size, className }: { src: string; name:
       className={cn(styles.photo, SHAPE_CLASSES[shape], className)}
       style={{ "--photo-width": width, "--photo-height": height } as CSSProperties}
     />
+  );
+}
+
+/** The website pairs the organisation with location and the role with dates. */
+function PortfolioEntryHead({ title, subtitle, location, dates }: { title: string; subtitle: string; location?: string; dates: string }) {
+  return (
+    <div className={styles.portfolioEntryHead}>
+      <div className={styles.entryHead}>
+        <span className={styles.entryTitle}>{title}</span>
+        {location && <span className={styles.dates}>{location}</span>}
+      </div>
+      <div className={styles.entryHead}>
+        <span className={styles.portfolioRole}>{subtitle}</span>
+        {dates && <span className={styles.dates}>{dates}</span>}
+      </div>
+    </div>
   );
 }
 
