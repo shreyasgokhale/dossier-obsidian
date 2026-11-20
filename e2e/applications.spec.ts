@@ -27,20 +27,36 @@ test("drags a card to another column", async ({ page }) => {
   await expect(column(page, "Screening")).toContainText("Kestrel Maps");
 });
 
-test("moves a card from the keyboard", async ({ page }) => {
-  await page.goto("/applications");
-  await page.getByRole("button", { name: /^Actions for Product Designer, Mobile, Kestrel Maps/ }).focus();
-  await page.keyboard.press("Enter");
-  // Radix moves focus to the first item once the menu is open.
-  await expect(page.getByRole("menuitemradio").first()).toBeFocused();
-  const interview = page.getByRole("menuitemradio", { name: /Interview/ });
-  for (let step = 0; step < 12 && !(await interview.evaluate((item) => item === document.activeElement)); step++) {
-    await page.keyboard.press("ArrowDown");
-  }
-  await expect(interview).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(column(page, "Interview")).toContainText("Kestrel Maps");
-});
+for (const { key, slowClient } of [
+  { key: "Enter", slowClient: false },
+  { key: "Enter", slowClient: true },
+  { key: "Space", slowClient: true },
+  { key: "ArrowDown", slowClient: true },
+]) {
+  test(`moves a card from the keyboard${slowClient ? ` on a slow client using ${key}` : ""}`, async ({ page }) => {
+    if (slowClient) {
+      const session = await page.context().newCDPSession(page);
+      await session.send("Emulation.setCPUThrottlingRate", { rate: 8 });
+    }
+    await page.goto("/applications");
+    const trigger = page.getByRole("button", { name: /^Actions for Product Designer, Mobile, Kestrel Maps/ });
+    await trigger.focus();
+    await page.keyboard.press(key);
+    // Opening keys must focus the first item even if pressed during hydration.
+    await expect(page.getByRole("menuitemradio").first()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(trigger).toBeFocused();
+    await page.keyboard.press(key);
+    await expect(page.getByRole("menuitemradio").first()).toBeFocused();
+    const interview = page.getByRole("menuitemradio", { name: /Interview/ });
+    for (let step = 0; step < 12 && !(await interview.evaluate((item) => item === document.activeElement)); step++) {
+      await page.keyboard.press("ArrowDown");
+    }
+    await expect(interview).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(column(page, "Interview")).toContainText("Kestrel Maps");
+  });
+}
 
 test("changes a status in the table", async ({ page }) => {
   await page.goto("/applications?view=table");

@@ -79,7 +79,7 @@ test("a run through the app", async ({ page }) => {
 
   // Switching the resume's theme.
   await page.goto("/resume");
-  await expect(page.getByRole("button", { name: "Editorial theme, in use" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Portfolio theme, in use" })).toBeVisible();
   await linger(page);
   for (const theme of ["Classic", "Modern", "Technical"]) {
     await page.getByRole("button", { name: `${theme} theme` }).click();

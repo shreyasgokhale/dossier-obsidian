@@ -1,4 +1,5 @@
 import "server-only";
+import { digestSetupProblem, runDailyDigest } from "@/lib/digest/run";
 
 import { z } from "zod";
 
@@ -50,6 +51,8 @@ export const agentQueryReady = (query: SearchQuery) => Boolean(query.keywords.tr
 
 /** Why the agent can't run at all, in words, or null when it's set up. */
 export async function agentSetupProblem(query: SearchQuery): Promise<string | null> {
+  const preferences = (await loadSettings()).searchPreferences;
+  if (preferences) return digestSetupProblem(preferences);
   if (!query.keywords.trim()) return "Add what to look for in Settings → Job agent first.";
   if (!query.country) return "Choose a country for the search in Settings → Job agent first.";
   if (!(await isAiConfigured())) return "Choose an AI provider in Settings → AI provider first.";
@@ -99,6 +102,7 @@ const newestFirst = (a: FoundPosting, b: FoundPosting) => (b.postedAt ? Date.par
  */
 export async function runAgentScan({ manual }: { manual: boolean }, context: JobContext, now = new Date()): Promise<AgentScanResult> {
   const settings = await loadSettings();
+  if (settings.searchPreferences) return runDailyDigest(manual,context,now);
   if (!settings.agentEnabled && !manual) return stopped("The job agent is off.");
   const setup = await agentSetupProblem(settings.agentQuery);
   if (setup) return stopped(setup);

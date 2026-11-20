@@ -39,7 +39,7 @@ test("the profile", async ({ page }) => {
 
 test("the base resume with its themes", async ({ page }) => {
   await page.goto("/resume");
-  await expect(page.getByRole("button", { name: "Editorial theme, in use" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Portfolio theme, in use" })).toBeVisible();
   await shot(page, "resume");
 });
 

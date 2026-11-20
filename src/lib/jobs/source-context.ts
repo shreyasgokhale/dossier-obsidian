@@ -7,6 +7,7 @@ import type { ProfileData } from "@/lib/profile";
 export const jobSourceContext = new AsyncLocalStorage<{
   config: AiConfig;
   profile: ProfileData;
+  rejectAiRedirects?: boolean;
   jobId?: string;
   type?: string;
 }>();

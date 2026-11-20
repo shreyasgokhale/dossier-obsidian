@@ -6,7 +6,7 @@ import { DEFAULT_BASE_THEME, settingsFromRows, settingValue, type SettingsData }
 
 /**
  * The settings in effect. Nothing in the database ties the base theme
- * setting to its theme, so a deleted custom theme reads as Editorial here.
+ * setting to its theme, so a deleted custom theme falls back to the default.
  */
 export async function loadSettings(): Promise<SettingsData> {
   const settings = settingsFromRows(await prisma.setting.findMany());

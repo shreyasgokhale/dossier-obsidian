@@ -85,7 +85,7 @@ const answers: Record<string, (messages: Message[]) => unknown> = {
   // which postings make the queue (70 is the default minimum) and which don't.
   posting_score: (messages) => {
     const { title } = section(messages[1].content, "The posting's facts:\n") as { title: string };
-    const score = /senior product designer/i.test(title) ? 91 : /product designer/i.test(title) ? 78 : 45;
+    const score = /lead product designer/i.test(title) ? 62 : /senior product designer/i.test(title) ? 91 : /product designer/i.test(title) ? 78 : 45;
     return {
       score,
       reasons: [score >= 70 ? `The profile's product design roles match "${title}".` : `"${title}" is further from the profile's roles.`],

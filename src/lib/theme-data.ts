@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-import { BUILT_IN_THEMES, type ThemeData } from "@/lib/themes";
+import { BUILT_IN_THEMES, DEFAULT_RESUME_THEME, type ThemeData } from "@/lib/themes";
 
 /** The columns a ThemeData needs, for `select`. */
 export const THEME_FIELDS = {
@@ -47,4 +47,8 @@ export async function loadThemeUsage(): Promise<Record<string, number>> {
 /** One theme, or null when it doesn't exist. */
 export async function loadTheme(id: string): Promise<ThemeData | null> {
   return prisma.theme.findUnique({ where: { id }, select: THEME_FIELDS });
+}
+
+export async function loadBaseTheme(id: string): Promise<ThemeData> {
+  return (await loadTheme(id)) ?? DEFAULT_RESUME_THEME;
 }

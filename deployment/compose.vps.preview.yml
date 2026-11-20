@@ -1,0 +1,4 @@
+# Tested Linux AMD64 Dossier production image.
+services:
+  app:
+    image: dossier-app:resume-8ae3b64350a60d79-amd64

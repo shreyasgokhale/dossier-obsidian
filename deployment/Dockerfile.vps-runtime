@@ -1,0 +1,15 @@
+# Package the verified production output without downloading dependencies again.
+# Context: only standalone/, static/, public/ and this Dockerfile.
+ARG CHECKS_IMAGE
+FROM ${CHECKS_IMAGE}
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    DOSSIER_DATA_DIR=/data \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
+COPY --chown=node:node standalone/ /app/runtime/
+COPY --chown=node:node static/ /app/runtime/.next/static/
+COPY --chown=node:node public/ /app/runtime/public/
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+CMD ["sh", "-c", "yarn prisma migrate deploy && yarn prisma db seed && exec node runtime/server.js"]

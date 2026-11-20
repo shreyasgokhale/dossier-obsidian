@@ -1,9 +1,107 @@
 # Implementation status
 
-Specification: [implementation-spec.md](implementation-spec.md). Updated 2026-10-23.
-Branch: `feature/configurable-markdown`; pushes are limited to this feature branch.
-No merge or production deployment.
+Specification: [implementation-spec.md](implementation-spec.md). Updated 2026-11-20.
+Feature branch: `feat/daily-job-digest`. Historical synthetic Nimbus deployment recorded below.
 Starting upstream: `4fd532973be9ecbae43b55de5e0c3e681f07e493` (Dossier 1.8.1).
+
+## Prepared digest and recovery verification — 2026-11-18
+
+Automatic preparation reuses the existing document writer for complete strong
+matches, under the configured per-run limit. It requires an explicitly allowed
+local AI endpoint. Packages can be reviewed and kept as unsent drafts. Digest
+Markdown output is limited to the designated service-owned projection. See
+[daily job digest](daily-job-digest.md) for setup.
+
+Next.js and its ESLint configuration were updated to 16.4.5. Immutable install,
+lint, production build and the full Vitest suite passed (1,818 tests passed and
+29 optional skips, with unchanged coverage thresholds). A standalone process
+served an isolated PostgreSQL 18.6 database. A native dump plus an application
+notes snapshot restored to fresh isolated storage. The browser signed in and
+opened the saved record before backup, after restore and after a restart. API
+readiness took 2.6 seconds on restore startup and 2.3 seconds on restart.
+
+The workspace build included the preserved prior local changes. Build the exact
+reviewed release for the target architecture before transfer. Nimbus SSH access
+is unavailable from this devcontainer. The next live step is collecting guest
+process and database evidence through an approved SSH route or console, then
+verifying the deployment and rollback with co-tenants accounted for. Nimbus
+reboot timing, off-home recovery and outage notification remain unverified.
+
+## Nimbus fresh deployment — 2026-11-02
+
+Explicit fresh setup authorized on `feat/daily-job-digest` at feature revision
+`6645580bf7efedb51270c5a6f0a8f6f1dd41b4cc`. Settings are in `vps.json`; operations
+are documented in [vps-deployment.md](vps-deployment.md). Target:
+`nim@192.168.8.219:/home/nim/services/dossier-obsidian`, Compose project
+`nimbus-dossier-obsidian`, working directory `deployment`, Compose file
+`deployment/compose.vps.yml`. The planned app URL is `http://192.168.8.219:3200`.
+
+Strict SSH checking verified hostname `nimbus`, Docker 29.9.2 and Compose
+v5.7.0. Preflight found 3447 MiB available RAM, 252 GiB free disk, no conflicting
+project containers or volumes, and no listener on port 3200. Existing Immich
+containers remain healthy and untouched.
+
+After an initial missing-environment validation failure, the user explicitly
+authorized creating fresh configuration. Random database and login passwords,
+an Argon2 login hash and a stable app secret were generated directly on Nimbus.
+The remote `.env` and `login-password` files have owner-only permissions and
+were not printed or downloaded. Compose validation now passes. Added nested
+credential exclusions to `.dockerignore`; credentials are not source inputs.
+
+Uploaded an inspected allowlist of 858 source/configuration files, excluding
+private data, environments, Git metadata and dependency/build output. A source
+manifest is retained locally at `work/vps/source-manifest.json`. Runtime uses
+named volumes seeded from synthetic fixtures, a read-only resume mount and the
+fake AI provider. No firewall changes, VM operations, merge or publication.
+
+Fresh verification completed on Nimbus (2026-11-03): Node 24.19.0 / Yarn
+4.18.1, Corepack, immutable install, Prisma generation, lint, typecheck and
+production build passed. Node's default 1 GiB heap exhausted during the first
+typecheck; explicitly allowing a 1536 MiB heap inside the unchanged 2 GiB
+container limit resolved it. The Compose checks profile records that setting.
+
+Full unit/database suite: 221 files passed, 4 skipped; 1802 tests passed,
+29 optional tests skipped. Coverage passed unchanged thresholds: statements
+86.27%, branches 80.05%, functions 84.79%, lines 88.45%. Unit database tests used
+`dossier_test`; browser tests used their separate `_e2e` database.
+
+Browser suite: 138 passed and 1 failed in 11.8 minutes. The failure repeated on
+its configured retry: `e2e/applications.spec.ts:30`, "moves a card from the
+keyboard", expects the first status menu radio item to have focus at line 35,
+but it remains inactive. Route generation and production compilation passed;
+this was a browser assertion failure, not an out-of-memory container exit.
+Diagnostics remain in the checks container under `/tmp/vps-checks`, with browser
+traces/error contexts under `/app/test-results`.
+
+The user subsequently explicitly authorized starting the app despite the known
+browser failure. A standard production-image build stopped at immutable Yarn
+checksum mismatches for `@prisma/streams-local@0.1.11` and
+`@anthropic-ai/sdk@1.3.0`. Integrity checks and the lockfile were preserved.
+Instead, `deployment/Dockerfile.vps-runtime` packaged the successful production
+standalone output, static assets and public files from the checks container,
+using the existing verified checks image as its base, with build networking
+disabled. Only those artifacts entered the build context; filename-only
+inspection found no environment or login credential files. This runtime retains
+the larger tooling image until a normal slim runtime can be rebuilt.
+
+Runtime image: `nimbus-dossier-obsidian:6645580bf7ef`, manifest list digest
+`sha256:f51aa48e6bda5b183c8a054449813a039fd34de1986a1e1b2e710c73e71f668d`.
+Compose validation and `up -d --wait --wait-timeout 120 app` passed. App,
+PostgreSQL and fake AI are healthy; the fixture initializer completed
+successfully. From the client LAN, both `/api/health` and `/login` returned HTTP
+200 at **http://192.168.8.219:3200**. The port binds only to Nimbus's LAN IP.
+Verified persistent app-data/notes mounts are writable and resume is read-only.
+The remote environment and login password files retain mode 0600. Immich's four
+containers remain healthy and unchanged. The idle checks container is retained
+with its diagnostics. No secrets were printed or downloaded; no private data,
+firewall or VM changes, merge or publication occurred.
+
+Next concrete step: fix the reproducible keyboard-focus failure and verify the
+registry checksum discrepancy before replacing this runtime with the standard
+production image. Preserve the existing remote credentials and named volumes.
+The short cloud-agent brief is [cloud-handoff.md](cloud-handoff.md); committed
+`vps.json` and [vps-deployment.md](vps-deployment.md) retain local deployment
+settings and the verified runtime snapshot without credential values.
 
 ## Container-only review — 2026-10-23
 
@@ -228,3 +326,321 @@ dossier_markdown_e2e databases.
 
 Next step: inspect GitHub CI on the updated PR #1. No merge or deployment
 performed.
+
+## Daily job digest — implementation and review handoff
+
+The newest work is on `feat/daily-job-digest`, based on `main` after checkout and
+successful `git pull --ff-only` at `23b9062` (Feature/configurable markdown #1).
+Implementation commit: `07c762c`. The initial implementation remained local; the
+feature branch was subsequently pushed to GitHub with user approval for review.
+No merge or app deployment was performed. The initial sandbox
+connection failure was resolved using the permitted execution path; pulling is
+not an outstanding blocker. AGENTS.md and the existing search/agent/profile,
+Markdown filesystem/merge worker, application and export workflows were inspected
+before implementation.
+
+Implemented:
+
+- Search Preferences in Dossier and `Search Preferences.md`, separate from
+  career history. Roles, city/country pairs, remote intent, exclusions, interests,
+  enabled sources and configurable employer boards have deterministic schemas.
+  Synchronization reuses guarded paths, atomic writes/recovery and the existing
+  advisory lock; durable snapshots/errors/conflicts preserve concurrent versions.
+- Multi-source discovery through existing JSearch, Adzuna and FreeHire adapters,
+  plus Arbeitnow, Daily Berlin Jobs and configured Greenhouse/Lever/Ashby boards.
+  Source/board failures and individual scoring failures preserve successful
+  results. Connection testing makes real board requests; no configured board is
+  reported connected without an HTTP check. BA remains interactive only, as
+  upstream explicitly requires.
+- Durable daily digests, discovery snapshots, profile-based fit reasons, missing
+  information/gaps, strong matches and at most three best stretch roles. The
+  existing agent job runner, timer, time zone, scoring cap and run limits are used.
+  Interrupted runs recover at startup. Digest discovery never enqueues drafts.
+- Canonical URL and normalized company/title identity suppression across sources,
+  saved/dismissed results and pursued applications. Dismissal/save use existing
+  Dossier storage. Start application enters the existing review/create workflow;
+  per-job Markdown starts only when an application exists.
+- Backup schema 7 includes digests, membership, discovery snapshots and identity/
+  preferences sync state; schemas 1–6 remain importable. Delete everything removes
+  the added state. The upstream transient score cache remains excluded, while
+  digest scores/reasons survive restore.
+- `yarn demo:digest --production` creates a new isolated synthetic database and
+  writable notes runtime, starts fake AI/source services, and populates four
+  strong matches plus a stretch role. Demo labels are visible in the digest and
+  history. The same vacancy from Arbeitnow/DBJ appears once; a simulated failed
+  Lever board leaves the other results intact. Existing upstream UI is retained.
+
+The reference repository was inspected at
+`umutyesildal/berlin-job-search@465f9ffd0c03cde62f898260d919c011c3c1d043`.
+Actual connector functions and API contracts were distinguished from browser
+recipes/search links. The MIT notice for endpoint/parser adaptation is retained
+in `docs/third-party/berlin-job-search-LICENSE`. No newsletter, automatic application,
+reference coaching workflow or document drafting was imported.
+
+### Verification evidence
+
+Node **24.19.0**, Yarn **4.18.1** (cached executable SHA-512 matches packageManager).
+Corepack enable was run using a workspace-writable install directory because the
+system binary directory is not writable. Immutable installation and Prisma Client
+generation passed. Additive migrations apply to empty disposable databases.
+
+- `yarn install --immutable`: passed; lockfile unchanged (existing peer warnings).
+- `yarn prisma generate`: passed, Prisma Client 7.10.1.
+- `yarn lint`: passed with no warnings.
+- `yarn typecheck`: passed, including generated Next.js route types.
+- `yarn test`: 1,799 passed / 29 opt-in-live tests skipped on the earlier full run.
+- Latest full `yarn test:coverage --maxWorkers=2`: **1,802 passed / 29 skipped**
+  (221 files passed / 4 skipped). All existing coverage thresholds are unchanged
+  and pass: global lines 88.45%, statements 86.27%, functions 84.79%, branches
+  80.05%; `src/lib` lines 95.15% (minimum 94%). A tooling warning skips the
+  non-code bundled-font README during coverage; the command exits successfully.
+- `yarn build`: passed, standalone Next.js production bundle.
+- `yarn test:e2e`: first full run 136 passed / 3 failed. The failures were in
+  existing keyboard-focus and publication-autosave tests (plus the dependent
+  publication test). Their files were not changed. Isolated rerun of both whole
+  files plus the digest flow: **9 passed**. Final full rerun on the stable production bundle: **139 passed** (5.3 minutes), including all original workflows and the new digest flow.
+- `yarn test:e2e:markdown`: **1 passed**, complete synthetic Markdown/resume/AI workflow.
+- `git diff --check`: passed.
+
+The isolated preview was verified with real Chromium and axe on both new screens:
+no accessibility violations and no browser errors. Five digest items were created
+while the nine seeded applications and nine associated Markdown notes remained
+nine, and there were zero automatic draft jobs. Screenshots are retained at
+`docs/screenshots/digest/daily-digest.png` and
+`docs/screenshots/digest/search-preferences.png`.
+
+The following URL is **cloud-workspace-local**, not accessible through a
+reviewer's computer's localhost:
+`http://localhost:3200/digest?id=cmvvlqj13000166plpo3aem08`, password **demo-password**.
+This environment exposes no browser port-forwarding capability. The original chat
+handoff incorrectly presented this as a directly usable review link. For
+interactive review on your own computer, obtain `feat/daily-job-digest` and follow
+the local setup commands in `docs/daily-job-digest.md`.
+An earlier review-branch push was blocked pending explicit publishing permission;
+that rejected command did not execute. On 1 November 2026, the user approved
+publishing the review branch. `feat/daily-job-digest` was then successfully pushed
+to `shreyasgokhale/dossier-obsidian`. The source and synthetic screenshots are
+available on GitHub; the app remains undeployed. Review the [feature branch](https://github.com/shreyasgokhale/dossier-obsidian/tree/feat/daily-job-digest)
+and [digest screenshot](https://github.com/shreyasgokhale/dossier-obsidian/blob/feat/daily-job-digest/docs/screenshots/digest/daily-digest.png).
+The query pins the populated initial digest even if a later scheduled scan finds
+no new jobs. The preview remains running locally on port 3200 with fake AI on
+3996 and fake job sources on 3995. Runtime: `/tmp/dossier-demo-TfHREk`;
+database: `dossier_demo_a6f25ab63ba6`. Recreate a fresh isolated preview with
+`cd /workspace/dossier-obsidian && yarn demo:digest --production` after stopping
+the running preview. The complete build/setup command sequence is in the runbook.
+
+Both new screens also passed axe in dark mode. The running filesystem worker
+imported a synthetic preference-note edit, restored its original value, and left
+career history unchanged. Sanitized evidence is committed in
+`docs/evidence/daily-digest-preview.json` and live probe outcomes in
+`docs/evidence/daily-digest-source-probes.txt`.
+
+Exact source audit, feature behavior, limitations, reproduction and step-by-step
+review instructions are in `docs/daily-job-digest.md`. Raw command logs are in the
+ignored `work/` directory in this workspace.
+
+### Remaining limits and next concrete step
+
+Live probes to Arbeitnow, Daily Berlin Jobs, Greenhouse, Lever and Ashby all
+returned proxy CONNECT **403**, HTTP **000**. The managed outbound policy does
+not allow these hosts. These are **fixture-verified implementations**, not claims
+of successful live data retrieval; no real-source digest was generated. No bypass
+was attempted. JSearch/Adzuna also need the user's own configured credentials.
+
+Scanning is bounded to first pages (Arbeitnow one page, DBJ up to 500 rows,
+Lever up to 100; up to 10 employer boards and 12 role/location queries per source).
+DBJ detail hydration and additional reference ATS types are not implemented.
+Company boards must be configured from verified official board slugs. Locations
+are textual, with no distance/geocoding or inferred work eligibility. Dedupe
+conservatively treats one company/title across locations as one opportunity.
+The app must remain running as one instance for daily scheduling.
+
+Next concrete step: review the populated synthetic preview and feature-branch
+diff, then allow the public API hosts via the supported environment configuration
+and verify low-volume real requests with official employer slugs and any desired
+paid-source keys. Do not merge or deploy as part of this task.
+
+## Cloud handoff follow-up — 2026-11-10–11
+
+Work remains on `feat/daily-job-digest`. The scope is the two blockers in
+[cloud-handoff.md](cloud-handoff.md). No Nimbus connection, credentials, private
+vaults, merge, publication or deployment were used. All browser/AI/source inputs
+are synthetic. The existing deployed runtime was not accessed or changed.
+
+### Keyboard focus
+
+The original production-browser test passed locally, including 20 repeats.
+Adding 8× client CPU throttling reproduced the exact inactive-first-radio-item
+failure in all five attempts. Event instrumentation showed Enter arriving before
+Radix's document keyboard listener registered during hydration. The menu opened
+with focus on its container; Radix's keyboard-modality flag remained false.
+
+The shared dropdown wrapper records opening intent at the trigger and moves
+container focus into the first enabled item for keyboard openings. It preserves
+pointer behavior, caller handlers, refs, Radix navigation and dismissal. The
+existing board navigation assertions remain; slow-client variants exercise Enter,
+Space and ArrowDown, plus Escape/focus return and reopening. All 20 repeated
+keyboard workflows pass after the fix (21 tests including sign-in). Existing
+dropdown component tests also pass (9 tests). The minimized reproduction and
+timings are recorded in [keyboard evidence](evidence/keyboard-focus-2026-11-10.md).
+Temporary probes are confined to ignored `work/`; no application debug logging
+was retained.
+
+### Production dependency integrity
+
+The reported YN0018 errors did not reproduce with fresh downloads. Node 24.19.0
+and Yarn 4.18.1 accept the existing lockfile on macOS ARM64 and clean Linux
+ARM64/AMD64 dependency builds. `yarn install --immutable --check-cache` also passes
+inside the Linux dependency image, comparing re-fetched packages with both cache
+and lockfile. Neither `yarn.lock`, package versions, Dockerfile nor checksum
+validation was changed.
+
+For each reported package, two downloads from each of `registry.npmjs.org` and
+`registry.yarnpkg.com` were identical and matched the public registry's SHA-512
+`dist.integrity`. Separately, the Yarn ZIP SHA-512 values matched the complete
+existing lockfile checksums on both macOS and Linux ARM64. See
+[sanitized package evidence](evidence/dependency-integrity-2026-11-10.jsonl) and
+[repeatable checksum checks](markdown-runbook.md#diagnosing-production-dependency-checksums).
+The earlier failing host's response/cache bytes are unavailable, so its historical
+root cause is unproven; these results do not justify changing trusted checksums.
+
+The standard production Dockerfile builds successfully, including its separate
+`npm ci` migration tools and bundled Chromium. The final ARM64 image
+`dossier-readiness:local` was started normally on loopback port 3310 against fresh
+`dossier_image_e2e`: all additive migrations and built-in seeding passed. A real
+browser smoke check against that image passed health, slow-client menu focus,
+Escape/focus return and Chromium-generated PDF checks. No checks-image packaging
+workaround was used.
+
+Both final local artifacts build through `--target production`; nothing was
+pushed to a registry. Image identities reported by Docker:
+
+```text
+dossier-readiness:local  arm64  sha256:1e19e8a7cd5939126808e0f1fbc13defb6803a1346444e77f8e7b9036d4d31c4
+dossier-readiness:amd64  amd64  sha256:1fbdcc3fe7be3b7a24b399a86bf5ff292cc6d62f0e0e1290171dd5ab45dbf366
+```
+
+The refreshed ARM64 artifact passed the same browser/PDF smoke check. Its normal
+runtime user is `1000:1000` (`node`); the fresh database applied 38 migrations
+and the explicit synthetic demo seed created nine applications. AMD64 packaging
+was verified under emulation; runtime smoke verification used native ARM64.
+
+### Validation checkpoint
+
+The first complete browser run passed **139 tests** and exposed three additional
+test failures: calendar UTC timestamps interpreted in the Berlin host timezone,
+the previously recorded publication autosave race, and its dependent test. The
+calendar/publication cases both failed again in a focused 26-second run before
+the verification fixes. A synthetic SQL timestamp of `2026-11-11 14:00:00` was
+read by pg as `13:00Z` on this host, whereas Prisma stores these columns in UTC.
+Playwright now pins both the Node runner and browser to UTC. The publication
+trace contained only creation and citation-save requests before reload, with the
+DOI edit still debounced. The test now polls for the exact stored citation and
+normalized DOI before reloading, retaining every UI/resume/PDF assertion. The
+five-test calendar/publication file rerun passes. No production calendar or
+autosave behavior was changed.
+
+The next complete run passed **140 tests**, including all calendar/publication
+checks, and exposed two optimistic-navigation test races: the roles were reloaded
+before their drag order committed, and the update notice was navigated away from
+before its dismissal committed. Both files passed when isolated (3 tests including
+setup). Their existing optimistic UI assertions remain; the tests now also poll
+the exact stored order/dismissed version before navigation, so a persistence
+failure still fails the test. No production ordering or update-notice behavior
+was changed. All ten repeated reorder/update workflows pass after the test fixes
+(11 tests including setup). Final browser verification runs without concurrent
+image builds. The only application-runtime change remains dropdown focus.
+
+Corepack was enabled in a workspace-local bin directory; the exact Node/Yarn
+versions above were used. Immutable install, Prisma generation, lint, typecheck,
+`yarn test` and production build pass. Full `yarn test:coverage --maxWorkers=2`
+passes: **1,802 passed / 29 optional tests skipped**, 221 files passed / 4 skipped.
+All existing thresholds are unchanged: global lines **88.46%**, statements
+**86.29%**, functions **84.80%**, branches **80.05%**. Tests use only a disposable
+PostgreSQL 18.6 container on loopback port 55432; database test names end in `_test`.
+
+Final verification completed on 2026-11-11:
+
+- `yarn test:e2e`: **142 passed**, 4.2 minutes, without retries.
+- `yarn test:e2e:markdown`: **1 passed**, 34.5 seconds; complete synthetic
+  Markdown/resume/AI workflow. Screenshots went to ignored `work/screenshots`.
+- Standard ARM64 and AMD64 production images: both built; native ARM64 runtime
+  health, slow keyboard focus, Escape return and PDF smoke checks passed.
+- Lint, typecheck and `git diff --check`: pass after the final test changes.
+- Dependency pins, checksum validation, committed fixtures and all coverage
+  thresholds remain unchanged.
+
+Raw local logs and diagnostic harnesses are in ignored `work/logs` and
+`work/debug`. Disposable local test containers/network are removed after
+verification; the two production images remain available locally. No remote
+runtime was contacted or replaced.
+
+Next concrete step: review the feature-branch diff and the locally built
+production artifacts against the handoff. No merge or deployment was performed.
+If the original host later reports YN0018 again, preserve
+its failing package response/cache archive and sanitized registry configuration
+for comparison with this audit before changing any dependency pin.
+
+## Manual submission and follow-up evidence — 2026-11-18
+
+Application pages support an explicit manual submission record with the timestamp,
+employer and role, exact uploaded files, submitted text, and optional receipt.
+An identical retry returns the saved result. A different repeat is reported as a
+conflict. Keeping a prepared digest draft leaves it unsent.
+
+Follow-up evidence accepts owner-supplied replies, interview notes, small
+recordings, transcripts and employer feedback. Corrections link to earlier
+entries and retain the originals. The application activity links to dated
+evidence. Backup format 8 includes both records and accepts older files.
+
+Uploads currently allow eight submission files totaling 5 MiB and individual
+recordings up to 5 MiB. Installations with JSON exports over the browser's
+10 MiB import limit use PostgreSQL backup and restore for operational recovery.
+The Gmail send flow retains its existing behavior. Exact Gmail attachments,
+full-length recording upload, interview analysis and broader career-evidence
+selection remain open.
+
+The implementation uses synthetic records. Continue live verification from the
+Nimbus guest console. Host and guest access inputs are absent from this
+devcontainer. Preserve guest/container/DB and co-tenant evidence before a reset.
+
+## Website résumé snapshot and Portfolio skill groups — 2026-11-20
+
+`yarn resume:website` and its bundled `resume-website` command resolve a public
+source revision and stage its Markdown collections in a new read-only source
+snapshot. The existing preview and confirmation flow reviews the proposed
+profile changes. Synthetic tests cover conversion, reviewed import, stale
+previews, commit pinning, size limits, symlinks, and incomplete snapshots.
+See [website-resume.md](website-resume.md) for the workflow.
+
+Compared Dossier with the public website résumé and its A4 print stylesheet.
+Dossier selected Editorial when no base theme was saved, and Portfolio used a
+flat contact line and did not carry the website's skill groups through import.
+Portfolio is now the default for the base preview, PDF, and new applications
+when no theme is saved. Saved theme choices still apply. The Portfolio preview
+and PDF share the contact and location layout, the section order, and entry
+headings. Project URLs remain visible and clickable.
+
+The snapshot converter preserves skill categories. Import previews resolve
+matching skills by name and apply the reviewed category to the existing skill
+ID. The additive migration stores the category, and backup format 9 preserves
+it while accepting older exports. Tailored applications still render their
+editable skill text. Older snapshots remain usable and can be regenerated to
+include categories.
+
+Verified with Node 24.19.0, Yarn 4.18.1, immutable install, Prisma generation,
+lint, typecheck, build, and 1,826 passing unit and database tests (29 skipped).
+Coverage passed the existing thresholds. Signed-in synthetic Chromium verified
+the default Portfolio preview, A4 PDF, project URLs, theme selection and the
+application document flow. The complete synthetic Markdown browser workflow
+passed. The full browser run also surfaced a Startup page
+color-contrast failure that repeated in the focused run. The board keyboard
+check passed on rerun.
+
+The standard Linux AMD64 production image passed synthetic sign-in, grouped
+Portfolio preview, PDF export and additive migration checks. The optional
+Compose source override remains available for a reviewed snapshot.
+
+Next concrete step: compare an authenticated base résumé PDF with the reference
+print view and review a refreshed read-only snapshot before importing its skill
+groups.

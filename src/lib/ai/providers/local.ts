@@ -26,6 +26,7 @@ export class LocalProvider implements AIProvider {
     host: string,
     readonly model: string | null,
     private readonly timeoutMs: number,
+    private readonly request: typeof fetch = fetch,
   ) {
     this.host = host.replace(/\/+$/, "").replace(/\/v1$/, "");
   }
@@ -35,7 +36,7 @@ export class LocalProvider implements AIProvider {
     if (!flavour) {
       const probe = AbortSignal.timeout(10_000);
       try {
-        const response = await fetch(`${this.host}/api/version`, { signal: signal ? AbortSignal.any([signal, probe]) : probe });
+        const response = await this.request(`${this.host}/api/version`, { signal: signal ? AbortSignal.any([signal, probe]) : probe });
         const answer = response.ok ? ((await response.json().catch(() => null)) as { version?: unknown } | null) : null;
         flavour = typeof answer?.version === "string" ? "ollama" : "openai";
       } catch (error) {
@@ -44,8 +45,8 @@ export class LocalProvider implements AIProvider {
       flavours.set(this.host, flavour);
     }
     return flavour === "ollama"
-      ? new OllamaProvider(this.host, this.model, this.timeoutMs)
-      : new OpenAICompatibleProvider("LOCAL", `${this.host}/v1`, null, this.model, this.timeoutMs);
+      ? new OllamaProvider(this.host, this.model, this.timeoutMs, this.request)
+      : new OpenAICompatibleProvider("LOCAL", `${this.host}/v1`, null, this.model, this.timeoutMs, this.request);
   }
 
   complete(request: CompletionRequest): Promise<string>;

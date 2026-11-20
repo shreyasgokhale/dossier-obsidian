@@ -2,6 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 import { APP_PORT, appEnv, FAKE_AI_PORT, FAKE_GOOGLE_PORT, FAKE_JOBS_PORT, STORAGE_STATE } from "./e2e/support";
 
+// pg reads Prisma's UTC timestamp columns in the runner's local zone. Keep
+// SQL assertions and browser dates independent of the developer's host zone.
+process.env.TZ = "UTC";
+
 // End-to-end tests (E11-2): a production build (`yarn build` first) with its
 // own database, a fake AI server and fake job sources, in headless Chromium.
 // See DEVELOPMENT.md → "End-to-end tests".
@@ -17,6 +21,7 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL: `http://localhost:${APP_PORT}`,
+    timezoneId: "UTC",
     trace: "retain-on-failure",
     viewport: { width: 1400, height: 900 },
   },

@@ -379,7 +379,7 @@ function PostingList({
 }
 
 function StateBadges({ state }: { state: PostingState }) {
-  const badges = [state.applicationId && "Applied", state.saved && "Saved", state.dismissed && "Dismissed"].filter(Boolean) as string[];
+  const badges = [state.applicationId && (state.submitted ? "Applied" : "Draft"), state.saved && "Saved", state.dismissed && "Dismissed"].filter(Boolean) as string[];
   if (badges.length === 0) return null;
   return (
     <span className="flex shrink-0 gap-1.5">
@@ -492,7 +492,7 @@ function PostingDetail({
 
       {state.applicationId && (
         <p role="note" className="rounded-card bg-track px-4 py-3 text-meta">
-          You&apos;ve applied for this.{" "}
+          {state.submitted ? "You've applied for this." : "You have an application draft for this."}{" "}
           <Link href={`/applications/${state.applicationId}`} className="underline underline-offset-2">
             Open the application
           </Link>

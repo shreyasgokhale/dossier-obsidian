@@ -70,6 +70,7 @@ export async function countAgentQueue(): Promise<number> {
   const { agentMinScore } = await loadSettings();
   return prisma.agentCandidate.count({
     where: {
+      digestItems: { none: {} },
       OR: [
         { status: AgentCandidateStatus.SCORED, score: { gte: agentMinScore } },
         { status: AgentCandidateStatus.DRAFTED, applicationId: { not: null } },
@@ -90,7 +91,7 @@ export async function loadAgentView(now = new Date()): Promise<AgentView> {
     loadJobSearchConfig(),
     lastKnownTimeZone(),
     prisma.agentCandidate.findMany({
-      where: { status: { in: [AgentCandidateStatus.SCORED, AgentCandidateStatus.DRAFTING, AgentCandidateStatus.DRAFTED] } },
+      where: { digestItems: { none: {} }, status: { in: [AgentCandidateStatus.SCORED, AgentCandidateStatus.DRAFTING, AgentCandidateStatus.DRAFTED] } },
       orderBy: [{ score: "desc" }, { createdAt: "desc" }],
     }),
     prisma.job.findMany({
@@ -134,7 +135,7 @@ export async function loadAgentView(now = new Date()): Promise<AgentView> {
 
   return {
     enabled: settings.agentEnabled,
-    autoDraft: settings.agentAutoDraft,
+    autoDraft: settings.searchPreferences ? false : settings.agentAutoDraft,
     minScore: settings.agentMinScore,
     maxScores: settings.agentMaxScores,
     maxDrafts: settings.agentMaxDrafts,

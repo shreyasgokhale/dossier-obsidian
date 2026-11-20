@@ -1,0 +1,1 @@
+ALTER TABLE "DailyDigest" ADD COLUMN "discovered" JSONB NOT NULL DEFAULT '[]';

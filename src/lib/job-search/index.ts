@@ -8,6 +8,7 @@ import { JobSearchError, jobSearchError } from "./errors";
 import { adzuna } from "./adzuna";
 import { arbeitsagentur } from "./arbeitsagentur";
 import { freehire } from "./freehire";
+import { arbeitnow, dailyBerlin, companyBoards } from "./public-boards";
 import { jsearch } from "./jsearch";
 import { postingKey, type FoundPosting, type JobSource, type SearchPage, type SearchQuery } from "./search";
 import { sourceCovers } from "./sources";
@@ -22,6 +23,9 @@ export { JobSearchError } from "./errors";
 
 const ADAPTERS: { [S in JobSource]: JobSourceAdapter<S> } = {
   JSEARCH: jsearch,
+  ARBEITNOW: arbeitnow,
+  DAILY_BERLIN: dailyBerlin,
+  COMPANY_BOARDS: companyBoards,
   ADZUNA: adzuna,
   ARBEITSAGENTUR: arbeitsagentur,
   FREEHIRE: freehire,

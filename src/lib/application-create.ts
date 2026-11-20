@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { Prisma } from "@/generated/prisma/client";
 import { AgentCandidateStatus, ApplicationOrigin, type Tone } from "@/generated/prisma/enums";
 import { ActionError } from "@/lib/action";
 import { summaryText, tailoringSummary } from "@/lib/ai/tailoring-summary";
@@ -62,12 +63,13 @@ export type CreateApplicationInput = {
   tone: Tone;
   note: string;
   claim: ApplicationClaim;
+  aiProvenance?: Prisma.InputJsonArray;
 };
 
 const CLAIMED = "application:";
 
 /** Creates the application once; creating again with the same claim returns the one that exists. */
-export async function createApplicationFromDocuments({ reading, documents, match, details, postingUrl, tone, note, claim }: CreateApplicationInput): Promise<string> {
+export async function createApplicationFromDocuments({ reading, documents, match, details, postingUrl, tone, note, claim, aiProvenance }: CreateApplicationInput): Promise<string> {
   const [settings, profile] = await Promise.all([loadSettings(), loadProfile()]);
   const { extracted, extractedWith, matchedWith } = reading;
   const language = settings.docLanguage ?? extracted.language ?? "English";
@@ -131,6 +133,7 @@ export async function createApplicationFromDocuments({ reading, documents, match
         deadline: details.deadline ? new Date(`${details.deadline}T00:00:00Z`) : null,
         postingUrl,
         postingText: reading.posting,
+        aiProvenance,
         extracted,
         extractedWith,
         match,

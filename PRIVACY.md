@@ -124,3 +124,7 @@ What applies depends on who you run Dossier for, and this isn't legal advice.
 Self-hosting alone doesn't make a deployment compliant. Dossier's code shows what it stores and sends. It can't tell you whether your provider, its terms or your account settings meet what you need.
 
 When someone asks for their data, **Export** in Settings → Your data gives everything Dossier keeps except task data and failed sign-ins, which expire on their own, and the mail from Gmail and the Google account, which belong to the mailbox: the mail is still in Gmail. Deleting an application or **Delete everything** removes data as described [above](#what-deleting-removes).
+
+### Daily job digest and Search Preferences (fork)
+
+Search Preferences stores intended roles, places, remote preferences, exclusions, interests and enabled public career boards separately from career history. Enabled job sources receive search terms and filters, not the profile. Dossier's configured AI provider receives the posting, the existing scoring profile subset and Search Preferences to assess fit. Discovery results, digest history, saved postings, dismissals and fit explanations stay in Dossier's database and its normal exports/backups. Optional `Search Preferences.md` synchronization uses the configured local notes root and existing conflict/recovery safeguards. Discovery creates no per-job Markdown files; normal application Markdown starts only after the user creates an application. The digest does not send newsletters, apply, or automatically draft documents.

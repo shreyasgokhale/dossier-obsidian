@@ -1,6 +1,7 @@
 import "server-only";
 import { watch, type FSWatcher } from "node:fs";
 import { logServerError } from "@/lib/log";
+import { syncSearchPreferences } from "./search-preferences";
 import { reconcile } from "./service";
 import { syncDocuments, exportObsidian } from "./documents";
 const state = globalThis as unknown as {
@@ -18,6 +19,7 @@ export function startMarkdownWorker() {
     if (worker.busy) return;
     worker.busy = true;
     try {
+      await syncSearchPreferences();
       await reconcile();
       await syncDocuments();
       await exportObsidian();

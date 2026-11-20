@@ -5,9 +5,11 @@ import { demoProfile, demoResumeUnits } from "@/lib/demo-profile";
 import { LANGUAGE_SAMPLES, sampleProfile } from "@/lib/language-samples";
 import { BUILT_IN_THEMES } from "@/lib/themes";
 
+import type { UnitRenderer } from "./document-page";
 import { ResumeDocument } from "./resume-document";
 
 const themes = BUILT_IN_THEMES;
+const snapshotThemes = themes.filter((entry) => entry.id !== "portfolio");
 const theme = (id: string) => themes.find((entry) => entry.id === id)!;
 const profile = demoProfile();
 const today = new Date(2026, 8, 28);
@@ -15,9 +17,44 @@ const today = new Date(2026, 8, 28);
 const sectionTitles = () => screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
 
 describe("ResumeDocument", () => {
-  it.each(themes.map((entry) => [entry.name, entry] as const))("renders the demo profile in %s", (_, entry) => {
+  it.each(snapshotThemes.map((entry) => [entry.name, entry] as const))("renders the demo profile in %s", (_, entry) => {
     const { container } = render(<ResumeDocument theme={entry} profile={profile} paper="A4" today={today} />);
     expect(container.firstChild).toMatchSnapshot();
+  });
+
+  it("uses the portfolio’s section order and keeps tailored units editable", () => {
+    const renderUnit: UnitRenderer = ({ id, head, children }) => (
+      <div data-editable-unit={id}>{head}{children}</div>
+    );
+    const { container } = render(<ResumeDocument theme={theme("portfolio")} profile={profile} paper="A4" units={demoResumeUnits()} language="English" renderUnit={renderUnit} />);
+    const ids = Array.from(container.querySelectorAll("[data-editable-unit]"), (element) => element.getAttribute("data-editable-unit")!);
+    expect(sectionTitles().slice(0, 4)).toEqual(["Skills", "Work Experience", "Education", "Languages"]);
+    expect(ids[0]).toBe("summary");
+    expect(ids.some((id) => id.startsWith("experience:"))).toBe(true);
+  });
+
+  it("places the Portfolio location beside the header and links the contact details", () => {
+    render(<ResumeDocument theme={theme("portfolio")} profile={profile} paper="A4" language="English" />);
+    const header = screen.getByRole("heading", { level: 1 }).closest("header")!;
+    expect(within(header).getByText("Rotterdam, Netherlands").closest("aside")).toBeInTheDocument();
+    expect(within(header).getByRole("link", { name: "jane.doe@example.com" })).toHaveAttribute("href", "mailto:jane.doe@example.com");
+    expect(within(header).getByRole("link", { name: "example.com" })).toHaveAttribute("href", "https://example.com/");
+  });
+
+  it("shows imported skill groups and keeps uncategorized skills visible in Portfolio", () => {
+    const grouped = {
+      ...profile,
+      skills: [
+        { id: "a", name: "Zephyr", group: "Firmware" },
+        { id: "b", name: "Docker", group: "Infrastructure" },
+        { id: "c", name: "FreeRTOS", group: "Firmware" },
+        { id: "d", name: "Git" },
+      ],
+    };
+    render(<ResumeDocument theme={theme("portfolio")} profile={grouped} paper="A4" />);
+    const skills = screen.getByRole("heading", { name: "Skills" }).closest("section")!;
+    expect(within(skills).getAllByRole("listitem").map((item) => item.textContent))
+      .toEqual(["Firmware Zephyr, FreeRTOS", "Infrastructure Docker", "Git"]);
   });
 
   it("puts contact details in the header of single-column layouts", () => {

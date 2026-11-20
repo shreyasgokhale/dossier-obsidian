@@ -99,6 +99,8 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
       await tx.job.deleteMany();
       await tx.posting.deleteMany();
       await tx.postingSearch.deleteMany();
+      await tx.dailyDigest.deleteMany();
+      await tx.searchPreferenceSync.deleteMany();
       await tx.agentCandidate.deleteMany();
       await tx.startup.deleteMany();
       await tx.startupBlock.deleteMany();
@@ -146,11 +148,17 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
       const themeIds = new Set((await tx.theme.findMany({ select: { id: true } })).map((theme) => theme.id));
       await tx.application.createMany({
         data: applications.map((application) => ({
-          ...omit(application, "events", "documents", "messages", "notes", "facts", "userNote"),
+          ...omit(application, "events", "documents", "messages", "notes", "facts", "userNote", "submission", "evidence"),
           extracted: json(application.extracted),
           match: json(application.match),
           aiProvenance: json(application.aiProvenance),
         })),
+      });
+      await tx.applicationEvidence.createMany({
+        data: applications.flatMap(({ id, evidence }) => (evidence ?? []).map((entry) => ({ ...entry, applicationId: id }))),
+      });
+      await tx.applicationSubmission.createMany({
+        data: applications.flatMap(({ id, submission }) => submission ? [{ ...submission, applicationId: id }] : []),
       });
       await tx.statusEvent.createMany({
         data: applications.flatMap((application) => application.events.map((event) => ({ ...event, applicationId: application.id }))),
@@ -222,6 +230,9 @@ export async function importExport(db: PrismaClient, data: DossierExport): Promi
           applicationId: candidate.applicationId && applicationIds.has(candidate.applicationId) ? candidate.applicationId : null,
         })),
       });
+      await tx.dailyDigest.createMany({ data: data.dailyDigests.map(d => ({ ...d, preferences: requiredJson(d.preferences), discovered: requiredJson(d.discovered), sources: requiredJson(d.sources) })) });
+      await tx.digestItem.createMany({ data: data.digestItems });
+      await tx.searchPreferenceSync.createMany({ data: data.searchPreferenceSync.map(s => ({ ...s, snapshot: json(s.snapshot), conflict: json(s.conflict) })) });
       // Startups (#222) with what the user did with them; an application that isn't in the file leaves one unlinked.
       await tx.startup.createMany({
         data: startups.map((startup) => ({

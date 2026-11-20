@@ -84,6 +84,14 @@ export async function undoStatusChange(
     if (latest?.id !== event.id) return { outcome: "superseded" };
 
     const restored = undoChange(event);
+    const submission = await tx.applicationSubmission.findUnique({
+      where: { applicationId: event.applicationId },
+      select: { submittedAt: true },
+    });
+    if (submission) {
+      if (!restored.sentAt) return { outcome: "superseded" };
+      restored.sentAt = submission.submittedAt;
+    }
     await tx.application.update({
       where: { id: event.applicationId },
       data: restored,

@@ -29,6 +29,7 @@ export const NAV: { label?: string; items: NavItem[] }[] = [
       { href: "/jobs", label: "Find jobs", icon: Search },
       { href: "/startups", label: "Startups", icon: Rocket },
       { href: "/agent", label: "Agent", icon: Bot },
+      { href: "/digest", label: "Daily digest", icon: FileText },
       {
         href: "/applications",
         label: "Applications",

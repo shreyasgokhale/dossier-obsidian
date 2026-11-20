@@ -12,9 +12,10 @@ import { fullText } from "@/lib/job-search/find";
 import { postingText, type FoundPosting } from "@/lib/job-search/search";
 import { readPostingJob } from "@/lib/jobs/read-posting";
 import { cancelJob, defineJob, findUnfinishedJobs, type JobContext } from "@/lib/jobs/runner";
+import { jobSourceContext } from "@/lib/jobs/source-context";
 import { writeDocumentsJob } from "@/lib/jobs/write-documents";
 import { logServerError } from "@/lib/log";
-import { dismissPosting, storePosting, unmarkPosting } from "@/lib/postings";
+import { storePostingTx, unmarkPosting } from "@/lib/postings";
 import { prisma } from "@/lib/prisma";
 import { loadSettings } from "@/lib/settings-data";
 
@@ -63,7 +64,12 @@ function detailsFrom(extracted: Extracted): ApplicationDetails {
  * retry, a second click and auto-draft can't make two applications; a failure
  * sends it back to SCORED with the error to show. Returns the application.
  */
-export async function draftCandidate(candidateId: string, context: JobContext): Promise<string> {
+export async function draftCandidate(
+  candidateId: string,
+  context: JobContext,
+  { partOfDigest = false } = {},
+): Promise<string> {
+  context.signal.throwIfAborted();
   const candidate = await prisma.agentCandidate.findUnique({ where: { id: candidateId } });
   if (!candidate) throw new ActionError("That posting is no longer in the agent's queue.");
   if (candidate.status === AgentCandidateStatus.DRAFTED && candidate.applicationId) return candidate.applicationId;
@@ -77,12 +83,25 @@ export async function draftCandidate(candidateId: string, context: JobContext): 
   try {
     const found = foundFromCandidate(candidate);
     // The source may have given only a snippet; the whole text writes a better draft.
-    const description = (await fullText(found)) ?? candidate.description;
+    const description = partOfDigest
+      ? candidate.description
+      : (await fullText(found)) ?? candidate.description;
     if (!description.trim()) throw new ActionError("That posting has no text to write from. Open it and start an application by hand.");
     const posting = postingText({ ...found, description });
 
     await context.step(`Reading the posting from ${name}`);
     const reading = await readPostingJob.run({ posting }, context);
+    if (partOfDigest) {
+      // Source fields identify the role on the review card and in its package.
+      reading.extracted = {
+        ...reading.extracted,
+        title: [candidate.title, candidate.company].filter(Boolean).join(" · "),
+        role: candidate.title || reading.extracted.role,
+        company: candidate.company || reading.extracted.company,
+        location: candidate.place || reading.extracted.location,
+        salary: candidate.salary || reading.extracted.salary,
+      };
+    }
     await context.step(`Writing the draft for ${name}`);
     const settings = await loadSettings();
     const documents = await writeDocumentsJob.run(
@@ -94,6 +113,8 @@ export async function draftCandidate(candidateId: string, context: JobContext): 
       await prisma.agentCandidate.update({ where: { id: candidateId }, data: { description, complete: true } });
     }
 
+    context.signal.throwIfAborted();
+    const source = partOfDigest ? jobSourceContext.getStore() : undefined;
     const applicationId = await createApplicationFromDocuments({
       reading: { posting, ...reading },
       documents,
@@ -103,9 +124,19 @@ export async function draftCandidate(candidateId: string, context: JobContext): 
       tone: settings.defaultTone,
       note: "",
       claim: { kind: "agent", candidateId, score: candidate.score },
+      ...(source && {
+        aiProvenance: [{
+          at: new Date().toISOString(),
+          provider: source.config.provider,
+          model: source.config.model,
+          sourceProfile: { ...source.profile, photo: null },
+        }],
+      }),
     });
     // The job holds nothing of the draft, but goes with it all the same.
-    await prisma.job.updateMany({ where: { id: context.id }, data: { applicationId } });
+    if (!partOfDigest) {
+      await prisma.job.updateMany({ where: { id: context.id }, data: { applicationId } });
+    }
     return applicationId;
   } catch (error) {
     const known = error instanceof AiError || error instanceof ActionError;
@@ -127,7 +158,7 @@ export const agentDraftJob = defineJob({
 
 /**
  * Approve: the draft becomes a normal Draft application, shown everywhere,
- * and its posting shows as applied for in Find jobs. Nothing is sent.
+ * and its posting links to the draft in Find jobs. Nothing is sent.
  */
 export async function approveCandidate(candidateId: string): Promise<string> {
   const candidate = await prisma.agentCandidate.findUnique({ where: { id: candidateId } });
@@ -135,13 +166,17 @@ export async function approveCandidate(candidateId: string): Promise<string> {
     throw new ActionError("That draft isn't ready to approve.");
   }
   const applicationId = candidate.applicationId;
-  const posting = await storePosting(foundFromCandidate(candidate));
-  await prisma.$transaction([
-    prisma.agentCandidate.update({ where: { id: candidateId }, data: { status: AgentCandidateStatus.APPROVED } }),
-    prisma.application.update({ where: { id: applicationId }, data: { awaitingReview: false } }),
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.agentCandidate.updateMany({
+      where: { id: candidateId, status: AgentCandidateStatus.DRAFTED, applicationId },
+      data: { status: AgentCandidateStatus.APPROVED },
+    });
+    if (claimed.count === 0) throw new ActionError("That draft isn't ready to approve.");
+    const posting = await storePostingTx(tx, foundFromCandidate(candidate), {});
+    await tx.application.update({ where: { id: applicationId }, data: { awaitingReview: false } });
     // One already linked to another application keeps it.
-    prisma.posting.updateMany({ where: { id: posting.id, applicationId: null }, data: { applicationId } }),
-  ]);
+    await tx.posting.updateMany({ where: { id: posting.id, applicationId: null }, data: { applicationId } });
+  });
   return applicationId;
 }
 
@@ -164,14 +199,21 @@ export async function dismissCandidate(candidateId: string): Promise<{ undo: Dis
   if (candidate.status === AgentCandidateStatus.APPROVED) throw new ActionError("That draft was approved: it's in Applications now.");
 
   for (const job of await findUnfinishedJobs(draftJobKey(candidateId))) await cancelJob(job.id);
-  const hadDraft = Boolean(candidate.applicationId) || candidate.status !== AgentCandidateStatus.SCORED;
-  await dismissPosting(foundFromCandidate(candidate));
-  await prisma.$transaction(async (tx) => {
+  const hadDraft = await prisma.$transaction(async (tx) => {
     // Locked, so a draft that's just being created either lands first and is deleted here, or finds it dismissed and isn't made.
     await tx.$queryRaw`SELECT 1 FROM "AgentCandidate" WHERE id = ${candidateId} FOR UPDATE`;
-    const current = await tx.agentCandidate.findUniqueOrThrow({ where: { id: candidateId }, select: { applicationId: true } });
+    const current = await tx.agentCandidate.findUniqueOrThrow({
+      where: { id: candidateId },
+      select: { applicationId: true, status: true, digestItems: { take: 1, select: { digestId: true } } },
+    });
+    if (current.status === AgentCandidateStatus.APPROVED) throw new ActionError("That draft was approved: it's in Applications now.");
+    if (current.status === AgentCandidateStatus.DISMISSED) return true;
+    if (current.digestItems.length > 0 && current.status !== AgentCandidateStatus.SCORED)
+      throw new ActionError("Keep the prepared draft in Applications to archive it there.");
+    await storePostingTx(tx, foundFromCandidate(candidate), { dismissedAt: new Date(), savedAt: null });
     if (current.applicationId) await tx.application.deleteMany({ where: { id: current.applicationId } });
     await tx.agentCandidate.update({ where: { id: candidateId }, data: { status: AgentCandidateStatus.DISMISSED, ...DISMISSED_TRIM } });
+    return Boolean(current.applicationId) || current.status !== AgentCandidateStatus.SCORED;
   });
   const { id, place, remote, salary, postedAt, url, via, description, complete, reasons, redFlags } = candidate;
   return { undo: hadDraft ? null : { id, place, remote, salary, postedAt, url, via, description, complete, reasons, redFlags } };

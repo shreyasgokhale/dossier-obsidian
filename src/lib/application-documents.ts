@@ -12,8 +12,8 @@ import { extractedSchema, trimmedSchema, unitsSchema, type Trimmed, type Unit } 
 import { prisma } from "@/lib/prisma";
 import { loadProfile } from "@/lib/profile-data";
 import { loadSettings } from "@/lib/settings-data";
-import { loadTheme, THEME_FIELDS } from "@/lib/theme-data";
-import { BUILT_IN_THEMES, type ThemeData } from "@/lib/themes";
+import { loadBaseTheme, THEME_FIELDS } from "@/lib/theme-data";
+import type { ThemeData } from "@/lib/themes";
 
 /**
  * The application for its page, with its documents and their themes, or the
@@ -26,7 +26,11 @@ export const loadApplication = cache(async (id: string) => {
     include: {
       documents: { include: { theme: { select: THEME_FIELDS } } },
       messages: { orderBy: { createdAt: "asc" } },
+      agentCandidate: {
+        select: { digestItems: { orderBy: { digest: { startedAt: "desc" } }, take: 1, select: { digestId: true } } },
+      },
       notes: true,
+      evidence: { select: { id: true, kind: true, occurredAt: true, createdAt: true } },
       events: { select: { id: true, to: true, at: true } },
       facts: { select: { id: true, text: true }, orderBy: [{ sort: "asc" }, { createdAt: "asc" }] },
     },
@@ -58,7 +62,7 @@ export type DocumentData = { units: Unit[]; theme: ThemeData; trimmed?: Trimmed 
  */
 export async function loadDocuments(id: string) {
   const [application, profile, settings] = await Promise.all([loadApplication(id), loadProfile(), loadSettings()]);
-  const baseTheme = (await loadTheme(settings.baseThemeId)) ?? BUILT_IN_THEMES[0];
+  const baseTheme = await loadBaseTheme(settings.baseThemeId);
   const documentData = (kind: DocumentKind): DocumentData | null => {
     const document = application.documents.find((entry) => entry.kind === kind);
     const units = document && readJson(unitsSchema, document.units);

@@ -34,7 +34,7 @@ export const saveAgentSettings = action(
   async (changes) => {
     const settings = await loadSettings();
     const query = changes.query ?? settings.agentQuery;
-    if (changes.enabled && !agentQueryReady(query)) {
+    if (changes.enabled && !settings.searchPreferences && !agentQueryReady(query)) {
       throw new ActionError(query.keywords.trim() ? "Choose a country for the search before turning the agent on." : "Type what the agent should look for before turning it on.");
     }
     await saveSettings({
@@ -75,6 +75,7 @@ const candidateId = z.string().min(1).max(100);
 /** Every screen an agent draft shows on, or leaves. */
 function revalidateAgent() {
   revalidatePath("/agent");
+  revalidatePath("/digest");
   revalidatePath("/applications");
   revalidatePath("/jobs");
   revalidatePath("/");

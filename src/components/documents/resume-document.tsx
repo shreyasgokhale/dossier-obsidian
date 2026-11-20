@@ -2,11 +2,12 @@ import { Fragment, type CSSProperties, type ReactNode } from "react";
 
 import { CitationText } from "@/components/citation";
 import { PhotoPosition, PhotoShape, type PaperSize, type ThemeLayout } from "@/generated/prisma/enums";
+import { publicationHref } from "@/lib/citation";
 import { cn } from "@/lib/cn";
-import { documentLabels } from "@/lib/document-labels";
+import { ageLabel, documentLabels, languagesLine } from "@/lib/document-labels";
 import { documentLanguage } from "@/lib/document-language";
-import type { ProfileData } from "@/lib/profile";
-import { resumeContent, type ResumeContent, type ResumeOptions } from "@/lib/resume-content";
+import { ageOn, type Basics, type ProfileData, type SkillItem } from "@/lib/profile";
+import { displayLink, resumeContent, type ResumeContent, type ResumeOptions } from "@/lib/resume-content";
 import { PHOTO_SHAPES, resolveTheme, type ThemeData } from "@/lib/themes";
 
 import { Contact, ContactLine, DocumentPage, DocumentSection, plainUnit, type UnitRenderer } from "./document-page";
@@ -48,6 +49,10 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
   const content = resumeContent(profile, options, labels);
   const { lang, dir } = documentLanguage(language, sampleText(content));
   const { shape, position } = resolved.photo;
+  const portfolio = resolved.portfolio;
+  const age = portfolio && profile.basics.showAge ? ageOn(profile.basics.dob, options.today ?? new Date()) : null;
+  const locations = portfolio ? new Map(profile.experience.map(({ id, location }) => [id, location])) : null;
+  const projectLinks = portfolio ? new Map(profile.projects.map(({ id, link }) => [id, publicationHref(link)])) : null;
   const photo = (size: "header" | "sidebar", className?: string) =>
     content.photo && <ResumePhoto key="photo" src={content.photo} name={content.name} shape={shape} size={size} className={className} />;
 
@@ -66,30 +71,44 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
     ),
     content.skills && (
       <DocumentSection key="skills" title={labels.skills}>
-        {renderUnit({ id: "skills", children: <p>{content.skills}</p> })}
+        {renderUnit({
+          id: "skills",
+          children: portfolio && !options.units ? <PortfolioSkills skills={profile.skills} /> : <p>{content.skills}</p>,
+        })}
       </DocumentSection>
     ),
     content.languages && (
       <DocumentSection key="languages" title={labels.languages}>
-        {renderUnit({ id: "languages", children: <p>{content.languages}</p> })}
+        {renderUnit({
+          id: "languages",
+          children: portfolio && content.languages === languagesLine(profile.languages, labels) ? (
+            <ul className={styles.portfolioLanguages}>
+              {profile.languages.map(({ id, name, level }) => (
+                <li key={id}><strong>{name}</strong> <span>{labels.levels[level]}</span></li>
+              ))}
+            </ul>
+          ) : <p>{content.languages}</p>,
+        })}
       </DocumentSection>
     ),
   ].filter(Boolean);
 
   const main = [
     content.summary && (
-      <DocumentSection key="summary" title={labels.profile}>
+      <DocumentSection key="summary" title={portfolio ? undefined : labels.profile}>
         {renderUnit({ id: "summary", children: <p className={styles.summary}>{content.summary}</p> })}
       </DocumentSection>
     ),
     content.experience.length > 0 && (
-      <DocumentSection key="experience" title={labels.experience}>
+      <DocumentSection key="experience" title={portfolio && labels.locale.split("-")[0] === "en" ? "Work Experience" : labels.experience}>
         {content.experience.map((role) => (
           <Fragment key={role.id}>
             {renderUnit({
               id: `experience:${role.id}`,
               className: styles.entry,
-              head: <EntryHead title={role.role} at={role.company} dates={role.dates} timeline={resolved.timeline} />,
+              head: portfolio
+                ? <PortfolioEntryHead title={role.company} subtitle={role.role} location={locations?.get(role.id)} dates={role.dates} />
+                : <EntryHead title={role.role} at={role.company} dates={role.dates} timeline={resolved.timeline} />,
               children: (
                 <>
                   {role.descriptor && <p className={styles.descriptor}>{role.descriptor}</p>}
@@ -102,7 +121,7 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
                   )}
                   {role.skills.length > 0 && (
                     <p className={styles.entrySkills}>
-                      <span className={styles.accent}>{`${labels.skills} · `}</span>
+                      {!portfolio && <span className={styles.accent}>{`${labels.skills} · `}</span>}
                       {role.skills.join(", ")}
                     </p>
                   )}
@@ -120,7 +139,15 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
             {renderUnit({
               id: `project:${project.id}`,
               className: styles.entry,
-              head: (
+              head: portfolio ? (
+                <PortfolioEntryHead
+                  title={project.name}
+                  detail={project.link && (
+                    <PortfolioContactLink text={project.link} href={projectLinks?.get(project.id) ?? null} />
+                  )}
+                  dates={project.dates}
+                />
+              ) : (
                 <EntryHead
                   title={project.name}
                   at={project.link && <Contact>{project.link}</Contact>}
@@ -130,7 +157,9 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
               ),
               children: (
                 <>
-                  {project.bullets.length > 0 && (
+                  {portfolio && project.bullets.length === 1 ? (
+                    <p className={styles.portfolioProjectDescription}>{project.bullets[0]}</p>
+                  ) : project.bullets.length > 0 && (
                     <ul className={styles.bullets}>
                       {project.bullets.map((bullet, index) => (
                         <li key={index}>{bullet}</li>
@@ -139,7 +168,7 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
                   )}
                   {project.skills.length > 0 && (
                     <p className={styles.entrySkills}>
-                      <span className={styles.accent}>{`${labels.skills} · `}</span>
+                      {!portfolio && <span className={styles.accent}>{`${labels.skills} · `}</span>}
                       {project.skills.join(", ")}
                     </p>
                   )}
@@ -157,7 +186,9 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
             {renderUnit({
               id: `education:${entry.id}`,
               className: styles.entry,
-              head: <EntryHead title={entry.degree} at={entry.school} dates={entry.dates} timeline={resolved.timeline} />,
+              head: portfolio
+                ? <PortfolioEntryHead title={entry.school} subtitle={entry.degree} dates={entry.dates} />
+                : <EntryHead title={entry.degree} at={entry.school} dates={entry.dates} timeline={resolved.timeline} />,
               children: entry.notes && <p className={styles.muted}>{entry.notes}</p>,
             })}
           </Fragment>
@@ -213,11 +244,15 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
   // Reading order matches what you see: the sidebar comes first in sidebar
   // layouts (and keeps its column even when empty) unless it's at the end of
   // the line, and its sections follow the main ones in a single column.
-  const columns = !resolved.split
-    ? [main, sidebar].filter((sections) => sections.length > 0)
-    : resolved.sidebarEnd
-      ? [main, sidebar]
-      : [sidebar, main];
+  const sections = [...main, ...sidebar];
+  const portfolioOrder = ["summary", "skills", "experience", "education", "languages", "projects", "publications", "references"];
+  const columns = portfolio
+    ? [portfolioOrder.flatMap((key) => sections.filter((section) => section && section.key === key))]
+    : !resolved.split
+      ? [main, sidebar].filter((column) => column.length > 0)
+      : resolved.sidebarEnd
+        ? [main, sidebar]
+        : [sidebar, main];
   // A tinted sidebar is drawn as a panel, unless there's nothing in it.
   const panel = resolved.tintedSidebar && sidebar.length > 0 ? sidebar : null;
 
@@ -225,7 +260,7 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
     <>
       <h1 className={styles.name}>{content.name}</h1>
       {content.headline && <p className={styles.headline}>{content.headline}</p>}
-      {!resolved.split && content.contacts.length > 0 && <ContactLine items={content.contacts} />}
+      {!portfolio && !resolved.split && content.contacts.length > 0 && <ContactLine items={content.contacts} />}
     </>
   );
   // A photo beside the name puts the name, headline and contacts in a block of their own.
@@ -236,7 +271,9 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
       <header className={cn(styles.header, beside && styles.headerWithPhoto)}>
         {position === PhotoPosition.ABOVE_NAME && photo("header", styles.photoAbove)}
         {position === PhotoPosition.HEADER_START && photo("header")}
-        {beside ? <div className={styles.headerText}>{title}</div> : title}
+        {portfolio ? (
+          <PortfolioHeader basics={profile.basics} age={age === null ? null : ageLabel(age, labels)} contactLabel={labels.contact}>{title}</PortfolioHeader>
+        ) : beside ? <div className={styles.headerText}>{title}</div> : title}
         {position === PhotoPosition.HEADER_END && photo("header")}
       </header>
       <div className={styles.columns}>
@@ -248,6 +285,62 @@ export function ResumeDocument({ theme, profile, paper, layout, language, render
       </div>
     </DocumentPage>
   );
+}
+
+function PortfolioSkills({ skills }: { skills: SkillItem[] }) {
+  const groups = new Map<string, string[]>();
+  for (const { name, group = "" } of skills) {
+    const entries = groups.get(group) ?? [];
+    entries.push(name);
+    groups.set(group, entries);
+  }
+  return (
+    <ul className={styles.portfolioSkills}>
+      {[...groups].map(([group, entries]) => (
+        <li key={group}>{group && <strong>{group} </strong>}{entries.join(", ")}</li>
+      ))}
+    </ul>
+  );
+}
+
+function PortfolioHeader({ basics, age, contactLabel, children }: { basics: Basics; age: string | null; contactLabel: string; children: ReactNode }) {
+  const location = [basics.city.trim(), basics.country.trim()].filter(Boolean).join(", ");
+  const email = basics.email.trim();
+  const phone = basics.phone.trim();
+  const links = [
+    { text: email, href: /^[^\s@]+@[^\s@]+$/.test(email) ? `mailto:${encodeURIComponent(email).replace("%40", "@")}` : null },
+    { text: phone, href: /^[\d+() .-]+$/.test(phone) ? `tel:${phone.replace(/[^\d+]/g, "")}` : null },
+    ...[basics.website, basics.linkedin].map((link) => ({ text: displayLink(link), href: publicationHref(link) })),
+  ].filter(({ text }) => text);
+
+  return (
+    <div className={styles.portfolioHeader}>
+      <div className={styles.portfolioHeaderMain}>
+        {children}
+        {links.length > 0 && (
+          <p className={styles.contactLine}>
+            {links.map(({ text, href }, index) => (
+              <Fragment key={index}>
+                {index > 0 && <span className={styles.portfolioContactSeparator} aria-hidden="true">·</span>}
+                <PortfolioContactLink text={text} href={href} />
+              </Fragment>
+            ))}
+          </p>
+        )}
+      </div>
+      {(location || age) && (
+        <aside aria-label={contactLabel} className={styles.portfolioHeaderMeta}>
+          {location && <Contact>{location}</Contact>}
+          {age && <Contact>{age}</Contact>}
+        </aside>
+      )}
+    </div>
+  );
+}
+
+function PortfolioContactLink({ text, href }: { text: string; href: string | null }) {
+  const label = <Contact>{text}</Contact>;
+  return href ? <a href={href}>{label}</a> : label;
 }
 
 const SHAPE_CLASSES: Record<PhotoShape, string | undefined> = {
@@ -269,6 +362,28 @@ function ResumePhoto({ src, name, shape, size, className }: { src: string; name:
       className={cn(styles.photo, SHAPE_CLASSES[shape], className)}
       style={{ "--photo-width": width, "--photo-height": height } as CSSProperties}
     />
+  );
+}
+
+/** The website pairs the organisation with location and the role with dates. */
+function PortfolioEntryHead({ title, subtitle, location, dates, detail }: { title: string; subtitle?: string; location?: string; dates: string; detail?: ReactNode }) {
+  const titleDetail = subtitle === undefined ? dates : location;
+  return (
+    <div className={styles.portfolioEntryHead}>
+      <div className={styles.entryHead}>
+        <p>
+          <span className={styles.entryTitle}>{title}</span>
+          {detail && <span className={styles.portfolioEntryDetail}>{", "}{detail}</span>}
+        </p>
+        {titleDetail && <span className={styles.dates}>{titleDetail}</span>}
+      </div>
+      {subtitle !== undefined && (subtitle || dates) && (
+        <div className={styles.entryHead}>
+          <span className={styles.portfolioRole}>{subtitle}</span>
+          {dates && <span className={styles.dates}>{dates}</span>}
+        </div>
+      )}
+    </div>
   );
 }
 

@@ -1,11 +1,13 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import {
   Prisma,
   type Application,
   type MarkdownLink,
 } from "@/generated/prisma/client";
 import type { ApplicationStatus } from "@/generated/prisma/enums";
+import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { applyStatusChangeTx } from "@/lib/status-changes";
 import {
@@ -34,6 +36,13 @@ import {
 import { mergeValues, type Conflict } from "./merge";
 
 type DB = Prisma.TransactionClient;
+/** Digest packages may sync only to a separately provisioned service projection. */
+export function projectionApplications(): Pick<Prisma.ApplicationWhereInput, "NOT"> {
+  if (process.env.DOSSIER_SERVICE_NOTES_ROOT &&
+      env.DOSSIER_SERVICE_NOTES_ROOT === path.resolve(notesRoot())) return {};
+  return { NOT: { agentCandidate: { is: { digestItems: { some: {} } } } } };
+}
+
 const json = (value: unknown) =>
   JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 const date = (value: string) =>
@@ -238,8 +247,10 @@ async function exportNew(tx: DB, applicationId: string, profileId: string) {
   });
   if (row.paused) return;
   const profile = profileSchema.parse(row.config);
-  const app = await tx.application.findUnique({ where: { id: applicationId } });
-  if (!app || app.awaitingReview) return;
+  const app = await tx.application.findUnique({
+    where: { id: applicationId, awaitingReview: false, ...projectionApplications() },
+  });
+  if (!app) return;
   const file = `Applications/${app.id}.md`;
   if (!matchesFile(file, profile)) return;
   const note = await tx.note.findFirst({
@@ -311,6 +322,7 @@ export async function reconcile() {
     const profiles = await tx.markdownProfile.findMany();
     const scanned = await scan(profiles);
     const links = await tx.markdownLink.findMany({
+      where: { application: projectionApplications() },
       include: { profile: true },
     });
     for (const link of links) {
@@ -470,7 +482,7 @@ export async function reconcile() {
       ) ?? profiles.find((p) => p.id === "default-frontmatter");
     if (defaultRow) {
       const unlinked = await tx.application.findMany({
-        where: { markdown: null, awaitingReview: false },
+        where: { markdown: null, awaitingReview: false, ...projectionApplications() },
         select: { id: true },
       });
       for (const app of unlinked) {
@@ -511,7 +523,7 @@ export async function resolveConflict(
 ) {
   return locked(async (tx) => {
     const link = await tx.markdownLink.findUniqueOrThrow({
-      where: { applicationId },
+      where: { applicationId, application: projectionApplications() },
       include: { profile: true },
     });
     // A pending draft pauses reconciliation, but existing conflicts must remain
@@ -596,7 +608,7 @@ export async function profileReview(id: string) {
   const candidate = profileSchema.parse(row.draft ?? row.config);
   const current = profileSchema.parse(row.config);
   const links = await prisma.markdownLink.findMany({
-    where: { profileId: id },
+    where: { profileId: id, application: projectionApplications() },
   });
   const files = [];
   for (const link of links) {
@@ -698,7 +710,7 @@ export async function activateProfile(id: string, token: string) {
   return locked(async (tx) => {
     // Upstream app edits use row locks, not the integration advisory lock.
     // Hold those rows before regenerating the reviewed proposal.
-    const links = await tx.markdownLink.findMany({ where: { profileId: id } });
+    const links = await tx.markdownLink.findMany({ where: { profileId: id, application: projectionApplications() } });
     for (const link of links) await appState(tx, link);
     const review = await profileReview(id);
     if (review.token !== token)

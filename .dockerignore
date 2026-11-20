@@ -4,6 +4,8 @@
 node_modules
 src/generated
 .env*
+**/.env*
+**/login-password
 npm-debug.log*
 Dockerfile
 .dockerignore

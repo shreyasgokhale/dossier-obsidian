@@ -1,11 +1,33 @@
 import { readFile } from "node:fs/promises";
 
 import { expect, test } from "@playwright/test";
+import { extractText, getDocumentProxy } from "unpdf";
 
 import { resetData } from "./support";
 
 // The theme builder (E5) and the PDF download (E5-5).
 test.beforeAll(resetData);
+
+test("uses the website print layout by default in the resume preview and PDF", async ({ page }) => {
+  await page.goto("/resume");
+  await expect(page.getByRole("button", { name: "Portfolio theme, in use" })).toBeVisible();
+  const resume = page.getByRole("article", { name: "Resume" });
+  await expect(resume.getByRole("heading", { level: 2 }).first()).toHaveText("Skills");
+  await expect(resume.getByRole("link", { name: "jane.doe@example.com" })).toHaveAttribute("href", "mailto:jane.doe@example.com");
+
+  const response = await page.request.get("/api/pdf?doc=base");
+  expect(response.ok()).toBe(true);
+  const pdf = await getDocumentProxy(new Uint8Array(await response.body()));
+  const { text } = await extractText(pdf, { mergePages: true });
+  const headings = ["SKILLS", "WORK EXPERIENCE", "EDUCATION", "LANGUAGES"];
+  const positions = headings.map((heading) => text.indexOf(heading));
+  expect(positions.every((position) => position >= 0)).toBe(true);
+  expect(positions).toEqual(positions.toSorted((a, b) => a - b));
+  const firstPage = await pdf.getPage(1);
+  const { width, height } = firstPage.getViewport({ scale: 1 });
+  expect(Math.abs(width - 595.28)).toBeLessThan(1);
+  expect(Math.abs(height - 841.89)).toBeLessThan(1);
+});
 
 test("builds a theme, makes it the base theme and downloads the resume as a PDF", async ({ page }) => {
   await page.goto("/resume");

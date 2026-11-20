@@ -27,6 +27,13 @@ function refreshEverything() {
 export const setStatus = action(
   z.object({ id: z.string().min(1), to: z.enum(ApplicationStatus) }),
   async ({ id, to }, { toast }) => {
+    if (to !== ApplicationStatus.DRAFT && to !== ApplicationStatus.DECLINED) {
+      const unsubmittedDigest = await prisma.application.findFirst({
+        where: { id, sentAt: null, agentCandidate: { digestItems: { some: {} } } },
+        select: { id: true },
+      });
+      if (unsubmittedDigest) throw new ActionError("Record the actual submission from the application page before moving this draft forward.");
+    }
     // An agent draft still waiting for review is approved by moving it on: it's being pursued (#195).
     if (to !== ApplicationStatus.DRAFT) {
       const pending = await prisma.agentCandidate.findFirst({ where: { applicationId: id, application: { awaitingReview: true } }, select: { id: true } });

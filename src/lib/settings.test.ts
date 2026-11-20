@@ -26,8 +26,9 @@ describe("document dates", () => {
 });
 
 describe("stored settings", () => {
-  it("reads an empty table as the prototype's defaults", () => {
+  it("defaults to the website résumé theme when no theme is saved", () => {
     expect(settingsFromRows([])).toEqual({
+      searchPreferences: null,
       provider: null,
       baseUrl: null,
       model: null,
@@ -46,7 +47,7 @@ describe("stored settings", () => {
       pageLimit: "2",
       nightlyBackup: true,
       jobRetentionHours: 24,
-      baseThemeId: "editorial",
+      baseThemeId: "portfolio",
       applicationsView: "board",
       applicationsFilter: "all",
       applicationsSort: "updated",

@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { BUILT_IN_THEMES } from "@/lib/themes";
 import { decryptApiKey, encryptApiKey } from "@/lib/ai/api-key";
 import { decryptSecret, encryptSecret, JOB_SOURCE_KEY } from "@/lib/secrets";
 import { createTestClient, resetDatabase } from "@/test/db";
@@ -41,6 +42,7 @@ afterAll(() => prisma().$disconnect());
 
 describe("importExport (E10-6)", () => {
   it("restores everything as it was exported", async () => {
+    await prisma().skill.update({ where: { name: "Figma" }, data: { group: "Design" } });
     const file = await asFile();
     const before = await snapshot();
 
@@ -56,9 +58,10 @@ describe("importExport (E10-6)", () => {
     await importExport(prisma(), file);
     expect(await snapshot()).toBe(before);
     expect(await prisma().documentVersion.count()).toBe(1);
-    expect(await prisma().theme.count({ where: { builtIn: true } })).toBe(12);
+    expect(await prisma().theme.count({ where: { builtIn: true } })).toBe(BUILT_IN_THEMES.length);
     expect(await prisma().projectSkill.count()).toBe(3);
     expect(await prisma().fact.count()).toBe(3);
+    expect(await prisma().skill.findUniqueOrThrow({ where: { name: "Figma" } })).toMatchObject({ group: "Design" });
   });
 
   it("keeps the next interview's date, and reads older files without it (E9-9)", async () => {

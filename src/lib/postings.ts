@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Posting } from "@/generated/prisma/client";
+import type { Posting, Prisma } from "@/generated/prisma/client";
 import { linkKey, postingKey, type FoundPosting, type JobSource, type PostingState, type ShownPosting } from "@/lib/job-search/search";
 import { stringsOf } from "@/lib/agent/candidates";
 import { prisma } from "@/lib/prisma";
@@ -31,7 +31,7 @@ function fieldsOf(found: FoundPosting) {
 }
 
 /** A stored posting in the shape search results have. */
-export function foundFromPosting(posting: Posting): FoundPosting {
+export function foundFromPosting(posting: Pick<Posting, "source" | "externalId" | "title" | "company" | "place" | "remote" | "salary" | "postedAt" | "url" | "via" | "description" | "complete">): FoundPosting {
   return {
     source: posting.source,
     externalId: posting.externalId,
@@ -53,17 +53,21 @@ export function foundFromPosting(posting: Posting): FoundPosting {
  * whole description isn't replaced by a snippet; saved and dismissed dates
  * only change when `marks` says so.
  */
-export async function storePosting(found: FoundPosting, marks: { savedAt?: Date | null; dismissedAt?: Date | null } = {}): Promise<Posting> {
-  return prisma.$transaction(async (tx) => {
-    const where = whereRef(found);
-    const existing = await tx.posting.findUnique({ where, select: { complete: true } });
-    const { description, complete, ...rest } = fieldsOf(found);
-    const text = existing?.complete && !complete ? {} : { description, complete };
-    return tx.posting.upsert({
-      where,
-      create: { source: found.source, externalId: found.externalId, ...rest, description, complete, ...marks },
-      update: { ...rest, ...text, ...marks },
-    });
+type PostingMarks = { savedAt?: Date | null; dismissedAt?: Date | null };
+
+export async function storePosting(found: FoundPosting, marks: PostingMarks = {}): Promise<Posting> {
+  return prisma.$transaction((tx) => storePostingTx(tx, found, marks));
+}
+
+export async function storePostingTx(tx: Prisma.TransactionClient, found: FoundPosting, marks: PostingMarks): Promise<Posting> {
+  const where = whereRef(found);
+  const existing = await tx.posting.findUnique({ where, select: { complete: true } });
+  const { description, complete, ...rest } = fieldsOf(found);
+  const text = existing?.complete && !complete ? {} : { description, complete };
+  return tx.posting.upsert({
+    where,
+    create: { source: found.source, externalId: found.externalId, ...rest, description, complete, ...marks },
+    update: { ...rest, ...text, ...marks },
   });
 }
 
@@ -116,9 +120,8 @@ export async function countPostings(): Promise<{ saved: number; dismissed: numbe
 }
 
 /**
- * Where each of a page of results stands, by postingKey(). Applied also
- * counts applications made from the same link before Find jobs, ignoring
- * tracking parameters.
+ * Where each of a page of results stands, by postingKey(). Links also match
+ * applications created outside Find jobs, ignoring tracking parameters.
  */
 export async function postingStates(found: readonly (PostingRef & { url: string })[]): Promise<Map<string, PostingState>> {
   if (found.length === 0) return new Map();
@@ -126,30 +129,32 @@ export async function postingStates(found: readonly (PostingRef & { url: string 
   const [stored, applications, scores] = await Promise.all([
     prisma.posting.findMany({
       where: { OR: found.map(({ source, externalId }) => ({ source, externalId })) },
-      select: { id: true, source: true, externalId: true, savedAt: true, dismissedAt: true, applicationId: true },
+      select: { id: true, source: true, externalId: true, savedAt: true, dismissedAt: true, application: { select: { id: true, sentAt: true } } },
     }),
     // An agent draft waiting for review isn't applied for yet (#195).
-    prisma.application.findMany({ where: { postingUrl: { not: "" }, awaitingReview: false }, select: { id: true, postingUrl: true }, orderBy: { createdAt: "asc" } }),
+    prisma.application.findMany({ where: { postingUrl: { not: "" }, awaitingReview: false }, select: { id: true, postingUrl: true, sentAt: true }, orderBy: { createdAt: "asc" } }),
     prisma.postingScore.findMany({ where: { OR: refs } }),
   ]);
   const scoreOf = new Map(scores.map((row) => [postingKey(row), { score: row.score, reasons: stringsOf(row.reasons), redFlags: stringsOf(row.redFlags) }]));
   const byKey = new Map(stored.map((posting) => [postingKey(posting), posting]));
-  const byLink = new Map<string, string>();
+  const byLink = new Map<string, (typeof applications)[number]>();
   for (const application of applications) {
     const key = linkKey(application.postingUrl);
-    if (key && !byLink.has(key)) byLink.set(key, application.id);
+    if (key && !byLink.has(key)) byLink.set(key, application);
   }
   return new Map(
     found.map((posting) => {
       const row = byKey.get(postingKey(posting));
       const link = linkKey(posting.url);
+      const application = row?.application ?? (link ? byLink.get(link) : undefined);
       return [
         postingKey(posting),
         {
           postingId: row?.id ?? null,
           saved: Boolean(row?.savedAt),
           dismissed: Boolean(row?.dismissedAt),
-          applicationId: row?.applicationId ?? ((link && byLink.get(link)) || null),
+          applicationId: application?.id ?? null,
+          ...(application?.sentAt && { submitted: true }),
           score: scoreOf.get(postingKey(posting)) ?? null,
         },
       ];

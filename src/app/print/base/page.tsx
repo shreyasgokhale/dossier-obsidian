@@ -4,8 +4,8 @@ import { ResumeDocument } from "@/components/documents/resume-document";
 import { verifyPrintAccess } from "@/lib/pdf/print-access";
 import { loadProfile } from "@/lib/profile-data";
 import { loadSettings } from "@/lib/settings-data";
-import { loadTheme } from "@/lib/theme-data";
-import { BUILT_IN_THEMES, printCss } from "@/lib/themes";
+import { loadBaseTheme } from "@/lib/theme-data";
+import { printCss } from "@/lib/themes";
 
 export const metadata: Metadata = { title: "Base resume", robots: { index: false } };
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Base resume", robots: { index: false
 export default async function PrintBaseResumePage() {
   await verifyPrintAccess("/print/base");
   const [profile, settings] = await Promise.all([loadProfile(), loadSettings()]);
-  const theme = (await loadTheme(settings.baseThemeId)) ?? BUILT_IN_THEMES[0];
+  const theme = await loadBaseTheme(settings.baseThemeId);
 
   return (
     <>

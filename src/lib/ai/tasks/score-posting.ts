@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SearchPreferences } from "@/lib/digest/preferences";
 
 import type { ProfileData } from "@/lib/profile";
 
@@ -48,6 +49,7 @@ export type ScorePostingInput = {
   remote: boolean | null;
   salary: string;
   profile: ProfileData;
+  preferences?: SearchPreferences;
 };
 
 const MAX_REASONS = 4;
@@ -83,6 +85,7 @@ export const scorePosting: Task<ScorePostingInput, PostingScore> = async (provid
         role: "user",
         content: [
           `The candidate's profile:\n${profileForPrompt(profile)}`,
+          ...(input.preferences ? [`Search preferences (intent, never evidence of experience):\n${JSON.stringify(input.preferences)}`] : []),
           `The posting's facts:\n${JSON.stringify({ title, company, place, remote, salary }, null, 2)}`,
           `The posting:\n${postingForPrompt(posting)}`,
         ].join("\n\n"),

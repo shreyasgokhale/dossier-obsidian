@@ -8,7 +8,9 @@ export async function register() {
     // AI jobs left running by the previous process can't finish (E6-7).
     const { recoverInterruptedJobs } = await import("@/lib/jobs/runner");
     const { logServerError } = await import("@/lib/log");
-    await recoverInterruptedJobs().catch((error: unknown) => logServerError("startup", error));
+    await recoverInterruptedJobs().catch((error: unknown) =>
+      logServerError("startup", error),
+    );
 
     const { startMarkdownWorker } = await import("@/lib/markdown/worker");
     startMarkdownWorker();
@@ -25,8 +27,15 @@ export async function register() {
     const { startInboxSchedule } = await import("@/lib/google/sync");
     startInboxSchedule();
 
+    // Complete durable digest records before any new daily scan can start.
+    const { recoverInterruptedDigests } = await import("@/lib/digest/run");
+    await recoverInterruptedDigests().catch((error: unknown) =>
+      logServerError("digest recovery", error),
+    );
+
     // The job agent's daily run, while it's on (E16-4).
-    const { startAgentSchedule } = await import("@/lib/agent/schedule");
+    const { resetInterruptedDrafts, startAgentSchedule } = await import("@/lib/agent/schedule");
+    await resetInterruptedDrafts().catch((error: unknown) => logServerError("job agent draft recovery", error));
     startAgentSchedule();
 
     // Startups' daily refresh, once it was refreshed by hand and while the screen is in use (#222).
@@ -34,7 +43,9 @@ export async function register() {
     startStartupsSchedule();
 
     // DOSSIER_JOBS_SOURCE=arbeitsagentur: the log says what that choice means (#223).
-    const { arbeitsagenturStartupNotice, loadJobSearchConfig } = await import("@/lib/job-search/config");
+    const { arbeitsagenturStartupNotice, loadJobSearchConfig } = await import(
+      "@/lib/job-search/config"
+    );
     try {
       const notice = arbeitsagenturStartupNotice(await loadJobSearchConfig());
       if (notice) console.log(notice);
@@ -45,7 +56,9 @@ export async function register() {
     // DOSSIER_TELEMETRY, when set, is the usage ping's answer on record (#172).
     // Then the log says what the ping sends while it's on, or how to answer
     // while nobody has.
-    const { recordEnvChoice, usagePingNotice } = await import("@/lib/usage-ping");
+    const { recordEnvChoice, usagePingNotice } = await import(
+      "@/lib/usage-ping"
+    );
     const { loadSettings } = await import("@/lib/settings-data");
     try {
       await recordEnvChoice();

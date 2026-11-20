@@ -1,8 +1,11 @@
 "use client";
 
 import { DropdownMenu as MenuPrimitive } from "radix-ui";
+import { createContext, useContext, useRef, type ComponentProps, type RefObject } from "react";
 
 import { cn } from "@/lib/cn";
+
+const KeyboardOpening = createContext<RefObject<boolean> | null>(null);
 
 /**
  * A menu that opens from a trigger button, built on Radix DropdownMenu: it
@@ -19,22 +22,59 @@ import { cn } from "@/lib/cn";
  *     </DropdownMenu>
  */
 export function DropdownMenu({ modal = false, ...props }: MenuPrimitive.DropdownMenuProps) {
-  return <MenuPrimitive.Root modal={modal} {...props} />;
+  const keyboardOpeningRef = useRef(false);
+  return (
+    <KeyboardOpening.Provider value={keyboardOpeningRef}>
+      <MenuPrimitive.Root modal={modal} {...props} />
+    </KeyboardOpening.Provider>
+  );
 }
-export const DropdownMenuTrigger = MenuPrimitive.Trigger;
+export function DropdownMenuTrigger({ onKeyDown, onPointerDown, ...props }: ComponentProps<typeof MenuPrimitive.Trigger>) {
+  const keyboardOpeningRef = useContext(KeyboardOpening);
+  return (
+    <MenuPrimitive.Trigger
+      {...props}
+      onKeyDown={(event) => {
+        onKeyDown?.(event);
+        if (keyboardOpeningRef && !event.defaultPrevented && ["Enter", " ", "ArrowDown"].includes(event.key))
+          keyboardOpeningRef.current = true;
+      }}
+      onPointerDown={(event) => {
+        if (keyboardOpeningRef) keyboardOpeningRef.current = false;
+        onPointerDown?.(event);
+      }}
+    />
+  );
+}
 export const DropdownMenuRadioGroup = MenuPrimitive.RadioGroup;
 
 export function DropdownMenuContent({
   className,
   sideOffset = 6,
   align = "end",
+  onFocus,
   ...props
 }: MenuPrimitive.DropdownMenuContentProps) {
+  const keyboardOpeningRef = useContext(KeyboardOpening);
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Content
         sideOffset={sideOffset}
         align={align}
+        onFocus={(event) => {
+          onFocus?.(event);
+          // React can replay an opening key before Radix's document listener
+          // mounts during hydration. Preserve that intent at the trigger so
+          // focus still enters the first enabled item on a slow client.
+          if (!event.defaultPrevented && keyboardOpeningRef?.current && event.target === event.currentTarget) {
+            const first = event.currentTarget.querySelector<HTMLElement>(
+              '[role^="menuitem"]:not([data-disabled]):not([aria-disabled="true"])',
+            );
+            if (first) {
+              first.focus({ preventScroll: true });
+            }
+          }
+        }}
         className={cn(
           "z-30 flex min-w-[230px] flex-col rounded-card border border-line-popover bg-card p-1.5 shadow-menu",
           className,

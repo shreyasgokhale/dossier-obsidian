@@ -1,0 +1,5 @@
+https://www.arbeitnow.com/api/job-board-api?page=1: HTTP 000; curl: (56) CONNECT tunnel failed, response 403
+https://daily-berlin-jobs.vercel.app/api/v1/jobs?limit=1: HTTP 000; curl: (56) CONNECT tunnel failed, response 403
+https://boards-api.greenhouse.io/v1/boards/raisin/jobs?content=true: HTTP 000; curl: (56) CONNECT tunnel failed, response 403
+https://api.lever.co/v0/postings/qonto?mode=json&limit=1: HTTP 000; curl: (56) CONNECT tunnel failed, response 403
+https://api.ashbyhq.com/posting-api/job-board/galvany: HTTP 000; curl: (56) CONNECT tunnel failed, response 403

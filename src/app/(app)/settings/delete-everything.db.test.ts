@@ -1,4 +1,5 @@
 import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { BUILT_IN_THEMES } from "@/lib/themes";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -103,7 +104,7 @@ describe("deleteEverything (E10-8)", () => {
       prisma().resumeSource.count(),
     ]);
     expect(counts).toEqual(Array(22).fill(0));
-    expect(await prisma().theme.count({ where: { builtIn: true } })).toBe(12);
+    expect(await prisma().theme.count({ where: { builtIn: true } })).toBe(BUILT_IN_THEMES.length);
     expect(await readdir(dataDir.path)).toEqual([]);
   });
 

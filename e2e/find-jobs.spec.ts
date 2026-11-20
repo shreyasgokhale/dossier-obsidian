@@ -5,7 +5,7 @@ import { fakeJobSearches, resetData, sql } from "./support";
 // Find jobs (E14) against the fake job sources: search from the profile's
 // role and city, come back to the kept search without asking again, save,
 // dismiss and undo, then start an application from a posting and see it
-// marked as applied for.
+// linked as an unsent draft.
 test.beforeAll(resetData);
 
 test("searches, keeps postings, and starts an application from one", async ({ page }) => {
@@ -66,11 +66,11 @@ test("searches, keeps postings, and starts an application from one", async ({ pa
   await page.waitForURL(/\/applications\/c/, { timeout: 30_000 });
   const applicationId = new URL(page.url()).pathname.split("/").pop()!;
 
-  // The posting now knows its application, and says so.
+  // The posting links to the unsent application draft.
   const [posting] = await sql<{ applicationId: string | null }>(`SELECT "applicationId" FROM "Posting" WHERE "externalId" = 'e2e-ledgerly'`);
   expect(posting.applicationId).toBe(applicationId);
   await page.goto("/jobs?view=saved");
-  await expect(page.getByRole("list", { name: "Postings" }).getByRole("button", { name: /^Senior Product Designer, Payments/ })).toContainText("Applied");
+  await expect(page.getByRole("list", { name: "Postings" }).getByRole("button", { name: /^Senior Product Designer, Payments/ })).toContainText("Draft");
   await expect(page.getByRole("link", { name: "Open the application" })).toHaveAttribute("href", `/applications/${applicationId}`);
 });
 

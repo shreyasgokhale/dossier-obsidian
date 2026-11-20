@@ -34,6 +34,7 @@ model Skill {
   id          String            @id @default(cuid())
   /// Unique ignoring case ("Figma" and "figma" are the same skill).
   name        String            @unique @db.Citext
+  group       String            @default("")
   sort        Int               @default(0)
   experiences ExperienceSkill[]
   projects    ProjectSkill[]
@@ -452,6 +453,8 @@ model Application {
   startup             Startup?
   /// Mail sent and received about it through Gmail (E15-3).
   emails              EmailMessage[]
+  submission          ApplicationSubmission?
+  evidence            ApplicationEvidence[]
   events              StatusEvent[]
   documents           Document[]
   messages            ChatMessage[]
@@ -465,6 +468,42 @@ model Application {
 
   @@index([status])
   @@index([updatedAt])
+}
+
+/// The owner-confirmed submission, with the exact files supplied for it.
+model ApplicationSubmission {
+  applicationId String      @id
+  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  submittedAt   DateTime
+  company       String
+  role          String
+  details       String
+  submittedText String      @default("")
+  files         Json
+}
+
+enum ApplicationEvidenceKind {
+  REPLY
+  INTERVIEW_NOTE
+  RECORDING
+  TRANSCRIPT
+  EMPLOYER_FEEDBACK
+}
+
+/// An owner-supplied follow-up item. Corrections append to the original.
+model ApplicationEvidence {
+  id            String                  @id @default(cuid())
+  applicationId String
+  application   Application             @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  kind          ApplicationEvidenceKind
+  text          String
+  fileName      String?
+  fileContent   String?
+  correctsId    String?
+  occurredAt    DateTime?
+  createdAt     DateTime                @default(now())
+
+  @@index([applicationId, createdAt])
 }
 
 /// One status change. Keeps the application's furthestStage and sentAt from
@@ -590,6 +629,9 @@ enum PostingSource {
   ADZUNA
   ARBEITSAGENTUR
   FREEHIRE
+  ARBEITNOW
+  DAILY_BERLIN
+  COMPANY_BOARDS
 }
 
 /// A posting from Find jobs that the user kept (E14-5): saved, dismissed, or
@@ -649,6 +691,8 @@ model ClaudePaste {
 /// it. Kept after it's dismissed, trimmed to what dedupe needs, so the same
 /// posting never comes back.
 model AgentCandidate {
+  identityKeys String[] @default([])
+  digestItems DigestItem[]
   id            String               @id @default(cuid())
   source        PostingSource
   /// The source's own id for it.
@@ -991,5 +1035,36 @@ model ResumeSource {
   contentHash String
   content Json
   targetId String?
+  updatedAt DateTime @updatedAt
+}
+
+/// Durable daily discovery results, independent of background job retention.
+model DailyDigest {
+  id String @id @default(cuid())
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+  demo Boolean @default(false)
+  preferences Json
+  discovered Json @default("[]")
+  sources Json
+  message String @default("")
+  items DigestItem[]
+  @@index([startedAt])
+}
+model DigestItem {
+  digestId String
+  digest DailyDigest @relation(fields: [digestId], references: [id], onDelete: Cascade)
+  candidateId String
+  candidate AgentCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  kind String
+  @@id([digestId, candidateId])
+}
+/// Three-way merge baseline and durable conflict/retry state for the preferences note.
+model SearchPreferenceSync {
+  id String @id @default("preferences")
+  snapshot Json?
+  fileHash String?
+  conflict Json?
+  error String?
   updatedAt DateTime @updatedAt
 }

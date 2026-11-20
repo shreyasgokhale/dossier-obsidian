@@ -5,7 +5,7 @@ import { updateDocumentsTx } from "@/lib/document-units";
 import { prisma } from "@/lib/prisma";
 import { MarkdownError } from "./format";
 import { hash, notesRoot, readNote, writeFileChecked } from "./files";
-import { locked } from "./service";
+import { locked, projectionApplications } from "./service";
 import { mergeValues } from "./merge";
 import type { Values } from "./profile";
 
@@ -75,7 +75,7 @@ export async function syncDocuments() {
   if (!process.env.DOSSIER_NOTES_ROOT) return;
   await locked(async (tx) => {
     const docs = await tx.document.findMany({
-      where: { application: { markdown: { isNot: null } } },
+      where: { application: { markdown: { isNot: null }, ...projectionApplications() } },
       include: {
         markdown: true,
         application: { include: { markdown: { include: { profile: true } } } },
@@ -87,7 +87,7 @@ export async function syncDocuments() {
       // snapshot writes so they describe the same document revision.
       await tx.$queryRaw`SELECT 1 FROM "Document" WHERE id = ${candidate.id} FOR UPDATE`;
       const doc = await tx.document.findUnique({
-        where: { id: candidate.id },
+        where: { id: candidate.id, application: projectionApplications() },
         include: {
           markdown: true,
           application: { include: { markdown: { include: { profile: true } } } },
@@ -241,7 +241,7 @@ export async function syncDocuments() {
 export async function repairDocument(documentId: string, expected: string) {
   await locked(async (tx) => {
     const doc = await tx.document.findUniqueOrThrow({
-      where: { id: documentId },
+      where: { id: documentId, application: projectionApplications() },
       include: { markdown: true, application: { include: { markdown: true } } },
     });
     if (!doc.markdown)
@@ -293,7 +293,7 @@ export async function resolveDocument(
 ) {
   await locked(async (tx) => {
     const doc = await tx.document.findUniqueOrThrow({
-      where: { id: documentId },
+      where: { id: documentId, application: projectionApplications() },
       include: { markdown: true, application: { include: { markdown: true } } },
     });
     if (!doc.markdown?.conflict)
@@ -345,7 +345,7 @@ const owned =
 export async function exportObsidian() {
   if (!process.env.DOSSIER_NOTES_ROOT) return;
   const apps = await prisma.application.findMany({
-    where: { markdown: { isNot: null } },
+    where: { markdown: { isNot: null }, ...projectionApplications() },
     include: {
       markdown: true,
       documents: true,

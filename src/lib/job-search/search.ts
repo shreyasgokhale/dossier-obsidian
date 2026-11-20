@@ -13,7 +13,7 @@ import { SOURCE_INFO } from "./sources";
 // job ad is a "posting".
 
 /** The job sources Dossier can search (E14-1 to E14-3, FreeHire), in the order Settings lists them; one is chosen there. */
-export const JOB_SOURCES = [PostingSource.JSEARCH, PostingSource.ADZUNA, PostingSource.FREEHIRE, PostingSource.ARBEITSAGENTUR] as const;
+export const JOB_SOURCES = [PostingSource.JSEARCH, PostingSource.ADZUNA, PostingSource.FREEHIRE, PostingSource.ARBEITNOW, PostingSource.DAILY_BERLIN, PostingSource.COMPANY_BOARDS, PostingSource.ARBEITSAGENTUR] as const;
 export type JobSource = PostingSource;
 
 /** Where a JSearch key comes from: OpenWeb Ninja directly, or the RapidAPI marketplace. */
@@ -100,6 +100,7 @@ export type PostingState = {
   dismissed: boolean;
   /** The application made from it, or from the same link before Find jobs. */
   applicationId: string | null;
+  submitted?: boolean;
   /** How well it fits the profile, once it's scored (#208). */
   score: PostingFit | null;
 };

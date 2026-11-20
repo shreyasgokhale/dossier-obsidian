@@ -152,6 +152,9 @@ export function credentialsFor<S extends JobSource>(config: JobSearchConfig, sou
       if (!config.arbeitsagentur.acceptedAt) throw jobSearchError("not-accepted", source);
       return {} as SourceCredentials[S];
     }
+    case "ARBEITNOW":
+    case "DAILY_BERLIN":
+    case "COMPANY_BOARDS":
     case "FREEHIRE":
       return {} as SourceCredentials[S];
   }

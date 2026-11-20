@@ -107,6 +107,16 @@ const schema = z.object({
       .transform(Number)
       .pipe(z.number().min(5, { error: "DOSSIER_AI_TIMEOUT_SECONDS must be at least 5." })),
   ),
+  // Writable Markdown projection provisioned separately from the authored vault.
+  DOSSIER_SERVICE_NOTES_ROOT: optional(z.string().refine(path.isAbsolute, {
+    error: "DOSSIER_SERVICE_NOTES_ROOT must be an absolute path.",
+  }).transform((dir) => path.resolve(dir))),
+  DOSSIER_DIGEST_DRAFT_AI_URL: optional(
+    z.url({
+      protocol: /^https?$/,
+      error: "DOSSIER_DIGEST_DRAFT_AI_URL must be an http:// or https:// URL.",
+    }).transform((url) => url.replace(/\/+$/, "")),
+  ),
   // Defaults for Settings → Job search (E14-4), until a choice is saved there.
   DOSSIER_JOBS_SOURCE: optional(
     z.enum(JOB_SOURCE_NAMES, {

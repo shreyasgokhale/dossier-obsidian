@@ -41,9 +41,11 @@ import {
   repairDocument,
   resolveDocument,
 } from "./documents";
-import { buildExport } from "@/lib/data-export";
+import { buildExport, EXPORT_SCHEMA_VERSION } from "@/lib/data-export";
 import { importExport, parseExport } from "@/lib/data-import";
 import { resumePreview, importResume } from "./resume";
+import { convertWebsiteResume } from "./website-resume";
+import { source, websiteConfig } from "@/test/website-resume-fixtures";
 const state = vi.hoisted(() => ({
   db: null as ReturnType<typeof createTestClient> | null,
 }));
@@ -538,7 +540,7 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
     await reconcile();
     const original = await text();
     const exported = await buildExport(db());
-    expect(exported.schemaVersion).toBe(6);
+    expect(exported.schemaVersion).toBe(EXPORT_SCHEMA_VERSION);
     const parsed = parseExport(JSON.stringify(exported));
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) throw new Error(parsed.error);
@@ -590,6 +592,41 @@ describe("Markdown integration against PostgreSQL and a real filesystem", () => 
     expect(await db().project.count()).toBe(1);
     await writeFile(path.join(root, "resume", "bad.md"), "no frontmatter");
     expect((await resumePreview("en")).errors.length).toBeGreaterThan(0);
+  });
+  it("previews converted website variants and refuses confirmation after a concurrent profile edit", async () => {
+    const converted = convertWebsiteResume([
+      source("about/about.md", {}, "Synthetic website summary."),
+      source("about/about-de.md", { lang: "de" }, "Synthetische Zusammenfassung."),
+      source("work/labs.md", { company: "Example Labs", role: "Engineer", location: "Berlin", dateStart: "02/01/2021", dateEnd: "Current" }),
+      source("work/labs.de.md", { company: "Example Labs", role: "Ingenieur", location: "Berlin", dateStart: "02/01/2021", dateEnd: "Current", lang: "de" }),
+      source("skills/systems.md", { category: "Systems" }, "- Example skill"),
+    ], websiteConfig);
+    const skill = await db().skill.create({ data: { name: "Example Skill" } });
+    const websiteRoot = path.join(root, "website");
+    for (const file of converted.sources) {
+      await mkdir(path.dirname(path.join(websiteRoot, file.path)), { recursive: true });
+      await writeFile(path.join(websiteRoot, file.path), file.text);
+    }
+    vi.stubEnv("DOSSIER_RESUME_ROOT", websiteRoot);
+    const preview = await resumePreview("en");
+    expect(preview.errors).toEqual([]);
+    expect(await db().experience.count()).toBe(0);
+    await db().profileField.upsert({ where: { key: "summary" }, create: { key: "summary", value: "Concurrent manual edit" }, update: { value: "Concurrent manual edit" } });
+    await expect(importResume("en", preview.token)).rejects.toThrow("changed");
+    const fresh = await resumePreview("en");
+    await importResume("en", fresh.token);
+    expect(await db().experience.count()).toBe(1);
+    expect((await resumePreview("en")).changes.every((change) => !change.changed)).toBe(true);
+    const german = await resumePreview("de");
+    await importResume("de", german.token);
+    expect(await db().experience.count()).toBe(1);
+    expect((await db().experience.findFirstOrThrow()).role).toBe("Ingenieur");
+    expect(await db().skill.findMany({ select: { id: true, name: true, group: true } })).toEqual([
+      { id: skill.id, name: skill.name, group: "Systems" },
+    ]);
+    expect(await db().resumeSource.count()).toBe(5);
+    for (const file of converted.sources)
+      expect(await readFile(path.join(websiteRoot, file.path), "utf8")).toBe(file.text);
   });
   it("activates a new profile explicitly and uses its template for new records", async () => {
     const staged = await stageProfile(undefined, { ...labeledProfile, name: "Custom labels" });
