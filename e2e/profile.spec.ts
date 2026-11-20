@@ -64,5 +64,6 @@ test("adds a project with its skills and shows it on the base resume (PRO-13)", 
   const resume = page.getByRole("article", { name: "Resume" });
   await expect(resume.getByRole("heading", { name: "Projects" })).toBeVisible();
   await expect(resume).toContainText("Churn predictor, github.com/jane/churn");
+  await expect(resume.getByRole("link", { name: "github.com/jane/churn" })).toHaveAttribute("href", "https://github.com/jane/churn");
   await expect(resume).toContainText("Shipped a dashboard the support team uses daily");
 });

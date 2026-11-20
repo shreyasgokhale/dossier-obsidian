@@ -43,10 +43,10 @@ import { appVersion } from "@/lib/version";
 // behind: they belong to the server or the mailbox, not the user's data.
 
 export const EXPORT_FORMAT = "dossier-export";
-/** Bump when the file's shape changes; imports refuse versions they don't know. 2 added Find jobs' postings and keys (E14-9), 3 projects (PRO-13) and the job agent (E16), 4 facts (PRO-14, APP-15), 5 publications (#218), the profile photo's theme and application options (#224) and Startups (#222), 6 the line about a role's company (#257), 7 daily digests and preference synchronization, 8 submission and follow-up evidence. */
-export const EXPORT_SCHEMA_VERSION = 8;
+/** Version 9 adds résumé skill groups. Bump when the file's shape changes. */
+export const EXPORT_SCHEMA_VERSION = 9;
 /** The versions imports can read. */
-export const EXPORT_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export const EXPORT_SCHEMA_VERSIONS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 /** The setting that holds the encrypted API key, which only this server can read. */
 const API_KEY_SETTING = "apiKeyEnc";
@@ -80,7 +80,7 @@ const optionalDate = date.nullable();
 const int = z.number().int();
 const text = z.string();
 
-const skill = z.object({ id: text, name: text, sort: int, createdAt: date });
+const skill = z.object({ id: text, name: text, group: text.default(""), sort: int, createdAt: date });
 const language = z.object({ id: text, name: text, level: z.enum(LanguageLevel), sort: int, createdAt: date });
 const span = {
   startYear: int.nullable(),
@@ -372,7 +372,7 @@ export const exportSchema = z.object({
   searchPreferenceSync: z.array(z.object({ id: text, snapshot: z.unknown().nullable(), fileHash: text.nullable(), conflict: z.unknown().nullable(), error: text.nullable(), updatedAt: date })).default([]),
   markdown: markdownExport.optional(),
   format: z.literal(EXPORT_FORMAT),
-  schemaVersion: z.literal([1, 2, 3, 4, 5, 6, 7, 8]),
+  schemaVersion: z.literal([1, 2, 3, 4, 5, 6, 7, 8, 9]),
   appVersion: text,
   exportedAt: date,
   profile: z.object({
@@ -428,7 +428,7 @@ export async function buildExport(
   return db.$transaction(async (tx) => {
     const [fields, skills, languages, experience, projects, education, publications, references, facts, themes, settings, applications, postings, searches, agentCandidates, startups, startupBlocks, markdownProfiles, markdownLinks, markdownDocuments, markdownWork, resumeSources, dailyDigests, digestItems, searchPreferenceSync] = await Promise.all([
       tx.profileField.findMany({ select: { key: true, value: true }, orderBy: { key: "asc" } }),
-      tx.skill.findMany({ select: { id: true, name: true, sort: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
+      tx.skill.findMany({ select: { id: true, name: true, group: true, sort: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
       tx.language.findMany({ select: { id: true, name: true, level: true, sort: true, createdAt: true }, orderBy: { createdAt: "asc" } }),
       tx.experience.findMany({ include: { skills: { select: { skillId: true } } }, orderBy: { createdAt: "asc" } }),
       tx.project.findMany({ include: { skills: { select: { skillId: true } } }, orderBy: { createdAt: "asc" } }),

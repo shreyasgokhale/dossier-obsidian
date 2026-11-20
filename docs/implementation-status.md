@@ -1,8 +1,7 @@
 # Implementation status
 
-Specification: [implementation-spec.md](implementation-spec.md). Updated 2026-11-03.
-Branch: `feat/daily-job-digest`; changes remain on the feature branch.
-No merge or private-data deployment. Synthetic Nimbus deployment recorded below.
+Specification: [implementation-spec.md](implementation-spec.md). Updated 2026-11-20.
+Feature branch: `feat/daily-job-digest`. Historical synthetic Nimbus deployment recorded below.
 Starting upstream: `4fd532973be9ecbae43b55de5e0c3e681f07e493` (Dossier 1.8.1).
 
 ## Prepared digest and recovery verification — 2026-11-18
@@ -604,3 +603,44 @@ selection remain open.
 The implementation uses synthetic records. Continue live verification from the
 Nimbus guest console. Host and guest access inputs are absent from this
 devcontainer. Preserve guest/container/DB and co-tenant evidence before a reset.
+
+## Website résumé snapshot and Portfolio skill groups — 2026-11-20
+
+`yarn resume:website` and its bundled `resume-website` command resolve a public
+source revision and stage its Markdown collections in a new read-only source
+snapshot. The existing preview and confirmation flow reviews the proposed
+profile changes. Synthetic tests cover conversion, reviewed import, stale
+previews, commit pinning, size limits, symlinks, and incomplete snapshots.
+See [website-resume.md](website-resume.md) for the workflow.
+
+Compared Dossier with the public website résumé and its A4 print stylesheet.
+Dossier selected Editorial when no base theme was saved, and Portfolio used a
+flat contact line and did not carry the website's skill groups through import.
+Portfolio is now the default for the base preview, PDF, and new applications
+when no theme is saved. Saved theme choices still apply. The Portfolio preview
+and PDF share the contact and location layout, the section order, and entry
+headings. Project URLs remain visible and clickable.
+
+The snapshot converter preserves skill categories. Import previews resolve
+matching skills by name and apply the reviewed category to the existing skill
+ID. The additive migration stores the category, and backup format 9 preserves
+it while accepting older exports. Tailored applications still render their
+editable skill text. Older snapshots remain usable and can be regenerated to
+include categories.
+
+Verified with Node 24.19.0, Yarn 4.18.1, immutable install, Prisma generation,
+lint, typecheck, build, and 1,826 passing unit and database tests (29 skipped).
+Coverage passed the existing thresholds. Signed-in synthetic Chromium verified
+the default Portfolio preview, A4 PDF, project URLs, theme selection and the
+application document flow. The complete synthetic Markdown browser workflow
+passed. The full browser run also surfaced a Startup page
+color-contrast failure that repeated in the focused run. The board keyboard
+check passed on rerun.
+
+The standard Linux AMD64 production image passed synthetic sign-in, grouped
+Portfolio preview, PDF export and additive migration checks. The optional
+Compose source override remains available for a reviewed snapshot.
+
+Next concrete step: compare an authenticated base résumé PDF with the reference
+print view and review a refreshed read-only snapshot before importing its skill
+groups.

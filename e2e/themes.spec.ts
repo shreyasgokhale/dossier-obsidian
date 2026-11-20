@@ -37,9 +37,9 @@ test("duplicates, exports, deletes and imports a theme", async ({ page }) => {
   const { violations } = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   expect(violations.filter((violation) => violation.impact === "serious" || violation.impact === "critical")).toEqual([]);
   await dialog.getByRole("button", { name: "Delete theme" }).click();
-  await expect(inUse).toHaveText("In use: Editorial");
+  await expect(inUse).toHaveText("In use: Portfolio");
   await expect(page.getByRole("button", { name: `${original} copy theme` })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Editorial theme, in use" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Portfolio theme, in use" })).toBeFocused();
 
   await page.locator("input[type=file][accept*=json]").setInputFiles({
     name: "theme.dossier-theme.json",

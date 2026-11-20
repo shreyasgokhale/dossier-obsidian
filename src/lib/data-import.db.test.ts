@@ -42,6 +42,7 @@ afterAll(() => prisma().$disconnect());
 
 describe("importExport (E10-6)", () => {
   it("restores everything as it was exported", async () => {
+    await prisma().skill.update({ where: { name: "Figma" }, data: { group: "Design" } });
     const file = await asFile();
     const before = await snapshot();
 
@@ -60,6 +61,7 @@ describe("importExport (E10-6)", () => {
     expect(await prisma().theme.count({ where: { builtIn: true } })).toBe(BUILT_IN_THEMES.length);
     expect(await prisma().projectSkill.count()).toBe(3);
     expect(await prisma().fact.count()).toBe(3);
+    expect(await prisma().skill.findUniqueOrThrow({ where: { name: "Figma" } })).toMatchObject({ group: "Design" });
   });
 
   it("keeps the next interview's date, and reads older files without it (E9-9)", async () => {

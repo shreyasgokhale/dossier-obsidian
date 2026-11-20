@@ -33,6 +33,30 @@ describe("ResumeDocument", () => {
     expect(ids.some((id) => id.startsWith("experience:"))).toBe(true);
   });
 
+  it("places the Portfolio location beside the header and links the contact details", () => {
+    render(<ResumeDocument theme={theme("portfolio")} profile={profile} paper="A4" language="English" />);
+    const header = screen.getByRole("heading", { level: 1 }).closest("header")!;
+    expect(within(header).getByText("Rotterdam, Netherlands").closest("aside")).toBeInTheDocument();
+    expect(within(header).getByRole("link", { name: "jane.doe@example.com" })).toHaveAttribute("href", "mailto:jane.doe@example.com");
+    expect(within(header).getByRole("link", { name: "example.com" })).toHaveAttribute("href", "https://example.com/");
+  });
+
+  it("shows imported skill groups and keeps uncategorized skills visible in Portfolio", () => {
+    const grouped = {
+      ...profile,
+      skills: [
+        { id: "a", name: "Zephyr", group: "Firmware" },
+        { id: "b", name: "Docker", group: "Infrastructure" },
+        { id: "c", name: "FreeRTOS", group: "Firmware" },
+        { id: "d", name: "Git" },
+      ],
+    };
+    render(<ResumeDocument theme={theme("portfolio")} profile={grouped} paper="A4" />);
+    const skills = screen.getByRole("heading", { name: "Skills" }).closest("section")!;
+    expect(within(skills).getAllByRole("listitem").map((item) => item.textContent))
+      .toEqual(["Firmware Zephyr, FreeRTOS", "Infrastructure Docker", "Git"]);
+  });
+
   it("puts contact details in the header of single-column layouts", () => {
     render(<ResumeDocument theme={theme("editorial")} profile={profile} paper="A4" today={today} />);
     expect(screen.getByText("jane.doe@example.com").parentElement?.textContent).toBe(

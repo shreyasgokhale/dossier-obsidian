@@ -1,0 +1,11 @@
+# Opt-in only, after verifying a completed public source snapshot and app UID access.
+# Append after the two Compose files in vps.json. The old resume volume is retained.
+services:
+  app:
+    volumes:
+      - type: bind
+        source: ${DOSSIER_WEBSITE_SNAPSHOT:?Set the absolute completed website snapshot directory}
+        target: /resume
+        read_only: true
+        bind:
+          create_host_path: false

@@ -205,6 +205,9 @@ against one notes mount. Recovery copies are retained until an operator removes
 them; include them in backup capacity planning.
 
 Resume collection schemas/examples are documented in `fixtures/resume/README.md`.
+For the public Astro website collections, see [website-resume.md](website-resume.md)
+and `yarn resume:website`; conversion stages a new commit-pinned snapshot for the
+same reviewed import flow.
 Source mounts are read-only. Removing sources reports a proposal and retains
 existing profile content. Suggestions for master content are reviewable text;
 the app never writes the website repository or source collection.

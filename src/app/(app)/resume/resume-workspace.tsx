@@ -16,7 +16,7 @@ import type { ProfileData } from "@/lib/profile";
 import { saveFile } from "@/lib/save-file";
 import { pagesInWords } from "@/lib/settings";
 import { parseThemeFile, themeFile, themeFileName } from "@/lib/theme-file";
-import { PAPER_SIZES, type ThemeData } from "@/lib/themes";
+import { DEFAULT_RESUME_THEME, PAPER_SIZES, type ThemeData } from "@/lib/themes";
 
 import { deleteTheme, duplicateTheme, importTheme, saveTheme, setBaseTheme } from "./actions";
 import { draftFrom, ThemeBuilder, type ThemeDraft } from "./theme-builder";
@@ -56,7 +56,7 @@ export function ResumeWorkspace({ profile, themes: initialThemes, usage, baseThe
   const savedId = useRef(baseThemeId);
   const pickedId = useRef(baseThemeId);
 
-  const base = themes.find((entry) => entry.id === baseId) ?? themes[0];
+  const base = themes.find((entry) => entry.id === baseId) ?? DEFAULT_RESUME_THEME;
   const theme: ThemeData = draft ? { ...draft, id: draft.id ?? "draft", builtIn: false } : base;
   const empty =
     !profile.basics.name.trim() &&
@@ -253,6 +253,6 @@ function deleteDescription(applications: number): string {
     applications === 0
       ? "No application uses it."
       : `${applications === 1 ? "One application uses" : `${applications} applications use`} it; their documents will use your base theme instead.`;
-  return `${used} Editorial becomes your base theme. This can't be undone, but you can export the theme first.`;
+  return `${used} ${DEFAULT_RESUME_THEME.name} becomes your base theme. You can export the theme before deleting it.`;
 }
 

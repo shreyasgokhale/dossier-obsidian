@@ -1,68 +1,15 @@
 import "server-only";
 import path from "node:path";
-import { parseDocument } from "yaml";
-import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sameName } from "@/lib/profile";
 import { hash, listNotes, readNote } from "./files";
 import { MarkdownError } from "./format";
 import { locked } from "./service";
+import { parseResumeSource, type Entry } from "./resume-source";
 
-const collections = [
-  "about",
-  "experience",
-  "education",
-  "projects",
-  "skills",
-  "languages",
-] as const;
-const entrySchema = z.object({
-  source_id: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(/^[a-zA-Z0-9_-]+$/),
-  collection: z.enum(collections),
-  language: z.enum(["en", "de"]),
-  name: z.string().default(""),
-  headline: z.string().default(""),
-  role: z.string().default(""),
-  company: z.string().default(""),
-  location: z.string().default(""),
-  degree: z.string().default(""),
-  school: z.string().default(""),
-  link: z.string().default(""),
-  start: z
-    .string()
-    .regex(/^\d{4}(-(?:0[1-9]|1[0-2]))?$/)
-    .optional(),
-  end: z
-    .string()
-    .regex(/^\d{4}(-(?:0[1-9]|1[0-2]))?$/)
-    .optional(),
-  current: z.boolean().default(false),
-  level: z.enum(["NATIVE", "C2", "C1", "B2", "B1", "A2", "A1"]).optional(),
-});
-type Entry = z.infer<typeof entrySchema> & { body: string };
-export function parseResumeSource(text: string): Entry {
-  const match = /^---\r?\n([\s\S]*?)^---[ \t]*\r?\n?/m.exec(text);
-  if (!match || match.index !== 0)
-    throw new MarkdownError(
-      "Resume sources require YAML frontmatter with source_id, collection and language.",
-    );
-  const doc = parseDocument(match[1], { uniqueKeys: true });
-  if (doc.errors.length)
-    throw new MarkdownError(`Invalid source YAML: ${doc.errors[0].message}`);
-  const entry = entrySchema.parse(doc.toJS());
-  if (
-    ["skills", "languages", "projects"].includes(entry.collection) &&
-    !entry.name
-  )
-    throw new MarkdownError(`${entry.collection} sources require name.`);
-  if (entry.collection === "languages" && !entry.level)
-    throw new MarkdownError("Language sources require an explicit level.");
-  return { ...entry, body: text.slice(match[0].length).trim() };
-}
+export { parseResumeSource } from "./resume-source";
+
 function span(entry: Entry) {
   const parts = (date?: string) => (date ? date.split("-").map(Number) : []);
   const [startYear, startMonth] = parts(entry.start),
@@ -109,7 +56,7 @@ function target(entry: Entry) {
         ...span(entry),
       };
     case "skills":
-      return { name: entry.name };
+      return { name: entry.name, ...(entry.group && { group: entry.group }) };
     case "languages":
       return { name: entry.name, level: entry.level! };
   }
@@ -181,6 +128,9 @@ export async function resumePreview(language: "en" | "de") {
       const collection = s.entry.collection;
       const prev = previous.find((p) => p.id === s.id);
       const id = prev?.targetId ?? targetId(s.entry);
+      const namedSkill = collection === "skills"
+        ? current.skills.find((skill) => sameName(skill.name, s.entry.name))
+        : undefined;
       const before =
         collection === "about"
           ? Object.fromEntries(
@@ -188,8 +138,8 @@ export async function resumePreview(language: "en" | "de") {
                 .filter((b) => ["name", "headline", "summary"].includes(b.key))
                 .map((b) => [b.key, b.value]),
             )
-          : (current[collection].find((row) => row.id === id) ?? null);
-      const after = target(s.entry);
+          : (namedSkill ?? current[collection].find((row) => row.id === id) ?? null);
+      const after = namedSkill ? { ...target(s.entry), name: namedSkill.name } : target(s.entry);
       const changed =
         before === null ||
         Object.entries(after).some(
@@ -197,7 +147,7 @@ export async function resumePreview(language: "en" | "de") {
         );
       return {
         id: s.id,
-        targetId: id,
+        targetId: namedSkill?.id ?? id,
         collection,
         path: s.path,
         before,
@@ -279,13 +229,18 @@ export async function importResume(language: "en" | "de", token: string) {
             const existing = await tx.skill.findUnique({
               where: { name: entry.name },
             });
-            if (existing) id = existing.id;
-            else
+            const group = entry.group ? { group: entry.group } : {};
+            if (existing) {
+              id = existing.id;
+              if (entry.group)
+                await tx.skill.update({ where: { id }, data: group });
+            } else {
               await tx.skill.upsert({
                 where: { id },
-                create: { id, name: entry.name },
-                update: { name: entry.name },
+                create: { id, name: entry.name, ...group },
+                update: { name: entry.name, ...group },
               });
+            }
             break;
           }
           case "languages": {

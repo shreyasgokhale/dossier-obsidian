@@ -79,9 +79,9 @@ describe("ResumeWorkspace", () => {
     expect(screen.getByRole("heading", { name: "References" })).toBeInTheDocument();
   });
 
-  it("falls back to the first theme when the base theme is missing", () => {
+  it("falls back to Portfolio when the base theme is missing", () => {
     render(<ResumeWorkspace {...props} baseThemeId="deleted" />);
-    expect(previewLabel()).toBe("Editorial");
+    expect(previewLabel()).toBe("Portfolio");
   });
 
   it("shows a picked theme right away and saves it as the base theme (RES-2)", async () => {
@@ -163,15 +163,15 @@ describe("managing themes (E5-7)", () => {
 
   it("asks before deleting, says how many applications use the theme, then falls back", async () => {
     const user = userEvent.setup();
-    vi.mocked(deleteTheme).mockResolvedValueOnce({ ok: true, data: { baseThemeId: "editorial" } });
+    vi.mocked(deleteTheme).mockResolvedValueOnce({ ok: true, data: { baseThemeId: "portfolio" } });
     render(<ResumeWorkspace {...props} themes={[...BUILT_IN_THEMES, custom]} baseThemeId="c1" usage={{ c1: 2 }} />);
     await user.click(screen.getByRole("button", { name: "Delete Quiet green…" }));
     const dialog = screen.getByRole("alertdialog", { name: "Delete “Quiet green”?" });
-    expect(dialog).toHaveTextContent("2 applications use it; their documents will use your base theme instead. Editorial becomes your base theme.");
+    expect(dialog).toHaveTextContent("2 applications use it; their documents will use your base theme instead. Portfolio becomes your base theme.");
     await user.click(within(dialog).getByRole("button", { name: "Delete theme" }));
     expect(deleteTheme).toHaveBeenCalledWith({ id: "c1" });
     expect(screen.queryByRole("button", { name: /Quiet green theme/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Editorial theme, in use" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Portfolio theme, in use" })).toBeInTheDocument();
   });
 
   it("exports the theme in use as a file", async () => {

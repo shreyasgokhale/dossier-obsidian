@@ -67,7 +67,10 @@ RUN --mount=type=secret,id=proxy_ca \
     --banner:js='import { createRequire } from "node:module"; const require = createRequire(import.meta.url);' \
   && node_modules/.bin/esbuild scripts/hash-password.ts --bundle --platform=node --format=esm --target=node24 \
     --outfile=/tools/hash-password.mjs --banner:js='#!/usr/bin/env node' \
-  && chmod 755 /tools/hash-password.mjs
+  && node_modules/.bin/esbuild scripts/website-resume.mts --bundle --platform=node --format=cjs --target=node24 \
+    --outfile=/tools/website-resume.cjs \
+    --banner:js='#!/usr/bin/env node' \
+  && chmod 755 /tools/hash-password.mjs /tools/website-resume.cjs
 
 # Isolated synthetic review: baked source, browser and test tooling; no host mounts.
 FROM dev AS review
@@ -98,6 +101,7 @@ RUN --mount=type=bind,from=deps,source=/app/node_modules/playwright-core,target=
 COPY --from=build /tools ./tools
 # On the PATH, so `docker run --rm -it ghcr.io/aientech/dossier hash-password` works.
 RUN ln -s /app/tools/hash-password.mjs /usr/local/bin/hash-password
+RUN ln -s /app/tools/website-resume.cjs /usr/local/bin/resume-website
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public

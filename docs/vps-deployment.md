@@ -2,10 +2,24 @@
 
 `vps.json` identifies the dedicated Compose project and remote checkout. The
 fresh setup uses `deployment/compose.vps.yml`, synthetic fixtures, and the fake
-AI service. Port 3200 is bound only to Nimbus's LAN address. Immich is a separate
-project and must remain untouched.
+AI service. `deployment/compose.vps.preview.yml` selects the verified standard
+production image without changing the provisioned remote environment. Always
+use both Compose files in the order recorded in `vps.json`. Port 3200 is bound
+only to Nimbus's LAN address. Immich is a separate project and must remain
+untouched.
 
-Deployment snapshot (2026-11-03): feature revision
+## Release verification
+
+The standard Linux AMD64 production image uses Node 24.19.0 and Yarn 4.18.1.
+Synthetic checks on that image covered sign-in, grouped Portfolio preview, PDF
+generation and the additive skill-group migration.
+
+Keep the previous image override before selecting a different image. To roll
+back, replace the active override with the saved one and recreate only the app.
+The optional snapshot override in [website-resume.md](website-resume.md) is
+applied last when a reviewed read-only source is ready.
+
+Previous deployment snapshot (2026-11-03): feature revision
 `6645580bf7efedb51270c5a6f0a8f6f1dd41b4cc`, image
 `nimbus-dossier-obsidian:6645580bf7ef`, runtime manifest list digest
 `sha256:f51aa48e6bda5b183c8a054449813a039fd34de1986a1e1b2e710c73e71f668d`.
@@ -28,7 +42,8 @@ All Compose operations use this prefix on Nimbus:
 sudo -n docker compose \
   --project-directory /home/nim/services/dossier-obsidian/deployment \
   -p nimbus-dossier-obsidian \
-  -f /home/nim/services/dossier-obsidian/deployment/compose.vps.yml
+  -f /home/nim/services/dossier-obsidian/deployment/compose.vps.yml \
+  -f /home/nim/services/dossier-obsidian/deployment/compose.vps.preview.yml
 ```
 
 Validate with `config --quiet`, never expanded `config`. Use `ps` to inspect
@@ -46,7 +61,11 @@ Database unit tests use `dossier_test`; browser tests use their own `_e2e`
 databases. Never run either suite against the app database. Tests and builds
 must pass before starting the app. Preserve the generated `.env`, credential
 file and named volumes on subsequent deployments; update only image references
-when deploying a new revision, without printing the environment.
+in the preview override when deploying a new revision, without printing the
+environment. A previously verified standard production image may be transferred
+directly with `docker image save` / `docker image load`; retain its identity and
+the inspected Compose transfer manifest locally, and verify the loaded image
+before starting it.
 
 The initial startup was explicitly authorized with the known keyboard-focus
 browser failure recorded in `implementation-status.md`. A subsequent immutable
@@ -58,5 +77,6 @@ base. Its context contains only `.next/standalone` as `standalone/`,
 `.next/static` as `static/`, and `public/`, plus the Dockerfile. Build with
 `--network none` and an explicit `CHECKS_IMAGE`; no runtime environment files,
 credentials, test reports or authentication artifacts enter this context.
-This retains the larger checks image as the base until a normal production
-image can be rebuilt with verified registry archives.
+This retained the larger checks image as the base until the standard production
+image replaced it on 2026-11-11. The existing checks image still supplies the
+fake AI and fixture initializer; the app now uses the standard production target.

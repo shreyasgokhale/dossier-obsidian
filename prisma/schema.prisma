@@ -34,6 +34,7 @@ model Skill {
   id          String            @id @default(cuid())
   /// Unique ignoring case ("Figma" and "figma" are the same skill).
   name        String            @unique @db.Citext
+  group       String            @default("")
   sort        Int               @default(0)
   experiences ExperienceSkill[]
   projects    ProjectSkill[]

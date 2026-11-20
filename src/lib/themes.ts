@@ -69,6 +69,8 @@ export const BUILT_IN_THEMES: ThemeData[] = (
   ] satisfies (Omit<ThemeData, "builtIn" | StyleField> & Partial<Pick<ThemeData, StyleField>>)[]
 ).map((theme) => ({ ...THEME_STYLE_DEFAULTS, ...theme, builtIn: true }));
 
+export const DEFAULT_RESUME_THEME = BUILT_IN_THEMES.find((theme) => theme.id === PORTFOLIO_THEME_ID)!;
+
 /** The page is this many units wide, whatever the paper. */
 export const PAGE_WIDTH = 640;
 

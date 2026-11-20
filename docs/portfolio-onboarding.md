@@ -3,16 +3,19 @@
 The **Portfolio** theme adapts the public résumé's A4 print typography,
 margins, section order, and company and role headings. The base résumé and
 tailored CV use the same component for the editor preview and PDF. The cover
-letter uses the same typography and header rule. Select **Portfolio** under
-**Base resume → Themes** to use it for new applications. An existing draft
-has its own theme selector.
+letter uses the same typography and header rule. Portfolio is the base
+default when no theme has been saved. Select **Portfolio** under **Base resume →
+Themes** to switch a saved preference. New applications inherit that choice.
+An existing draft has its own theme selector.
 
 The reference is the public Astro résumé and its print stylesheet, reviewed
-2026-11-19. Dossier stores skills and languages as flat profile lists. The
-website adds skill groups and uses its own contact header and language labels.
-Compare a Dossier PDF with the live website's print output before recording
-exact visual parity. Use a representative tailored CV and cover letter to
-check wrapping and page breaks.
+2026-11-19. Portfolio uses the same contact and location alignment, section
+order, organization and role rows, and project title and date rows. A refreshed
+website snapshot carries skill categories into the base résumé. Tailored skill
+text follows its edited unit, and language levels follow the profile's reviewed
+CEFR options. Existing snapshots without categories can still be imported.
+Use a representative tailored CV and cover letter to check wrapping and page
+breaks.
 
 ## Apply the private onboarding data
 

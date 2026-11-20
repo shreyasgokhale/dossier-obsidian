@@ -4,6 +4,7 @@ import { searchPreferencesSchema } from "@/lib/digest/preferences";
 import { AiProvider, Creativity, DateFormat, PaperSize, Tone } from "@/generated/prisma/enums";
 import { EMPTY_QUERY, JOB_SOURCES, JSEARCH_HOSTS, searchQuerySchema } from "@/lib/job-search/search";
 import { startupsRefreshSchema } from "@/lib/startups/types";
+import { PORTFOLIO_THEME_ID } from "@/lib/themes";
 
 /** Date styles for documents (SET-6), labelled with an example as in the prototype. */
 export const DATE_FORMATS: readonly { value: DateFormat; label: string }[] = [
@@ -66,7 +67,7 @@ export const pagesInWords = (pages: number) => (pages === 1 ? "one page" : pages
 // name, flags as "true"/"false", lists as JSON. A missing key, or a value that
 // doesn't fit, reads as the default below; null means "not set".
 
-export const DEFAULT_BASE_THEME = "editorial";
+export const DEFAULT_BASE_THEME = PORTFOLIO_THEME_ID;
 
 const flag = (fallback: boolean) => z.stringbool().catch(fallback);
 
@@ -130,7 +131,7 @@ export const settingsSchema = z.object({
   nightlyBackup: flag(true),
   /** Finished background jobs are deleted after this many hours (JOB_RETENTION_OPTIONS). */
   jobRetentionHours: z.coerce.number().refine(isJobRetention).catch(DEFAULT_JOB_RETENTION_HOURS),
-  /** A theme's id. loadSettings() reads a deleted one as Editorial. */
+  /** A theme's id. loadSettings() falls back to the default when it is deleted. */
   baseThemeId: z.string().catch(DEFAULT_BASE_THEME),
   /** The Applications screen as last left (LST-7): view, filter and sort, e.g. "-match". */
   applicationsView: z.enum(["board", "table"]).catch("board"),

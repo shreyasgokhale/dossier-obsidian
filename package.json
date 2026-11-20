@@ -19,6 +19,7 @@
     "test:markdown": "vitest run src/lib/markdown",
     "test:e2e:markdown": "playwright test -c playwright.markdown.config.ts",
     "demo:resume": "tsx scripts/resume-demo.mts",
+    "resume:website": "tsx scripts/website-resume.mts",
     "test:livesync": "bash deployment/livesync/test.sh",
     "verify:restart": "tsx scripts/verify-restart.mts"
   },

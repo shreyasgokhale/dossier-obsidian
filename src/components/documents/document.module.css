@@ -533,6 +533,41 @@
   margin-bottom: 0;
 }
 
+.portfolioHeader {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: calc(var(--pt) * 24);
+  min-width: 0;
+}
+
+.portfolioHeaderMain {
+  min-width: 0;
+}
+
+.portfolioHeaderMeta {
+  flex: 0 1 auto;
+  text-align: end;
+  font-size: calc(var(--pt) * 8);
+  color: var(--doc-muted);
+}
+
+.portfolioHeaderMeta > bdi {
+  display: block;
+}
+
+.portfolioContactSeparator {
+  margin-inline: calc(var(--pt) * 3);
+  color: #999;
+}
+
+:is(.portfolioHeader, .portfolioEntryDetail) a {
+  color: #236795;
+  text-decoration: underline;
+  text-decoration-thickness: from-font;
+}
+
 .portfolio :is(.name, .senderName) {
   font-size: calc(var(--pt) * 18);
   font-weight: 700;
@@ -541,6 +576,7 @@
 }
 
 .portfolio .headline {
+  margin-block-start: var(--pt);
   font-size: calc(var(--pt) * 9);
   letter-spacing: .08em;
   text-transform: uppercase;
@@ -554,6 +590,26 @@
 
 .portfolio .section {
   gap: 0;
+}
+
+.portfolioSkills {
+  font-size: calc(var(--pt) * 8.5);
+  line-height: 1.4;
+  color: #333;
+}
+
+.portfolioSkills li + li {
+  margin-top: var(--pt);
+}
+
+.portfolioLanguages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 calc(var(--pt) * 18);
+}
+
+.portfolioLanguages span {
+  color: var(--doc-muted);
 }
 
 .portfolio .sectionTitle {
@@ -578,6 +634,17 @@
 .portfolio .entryTitle {
   font-size: calc(var(--pt) * 10);
   font-weight: 700;
+}
+
+.portfolioEntryDetail {
+  color: var(--doc-muted);
+  font-size: calc(var(--pt) * 8.5);
+  overflow-wrap: anywhere;
+}
+
+.portfolioProjectDescription {
+  color: var(--doc-muted);
+  font-size: calc(var(--pt) * 8);
 }
 
 .portfolioRole {
@@ -617,4 +684,11 @@
 .portfolio li {
   orphans: 2;
   widows: 2;
+}
+
+@media print {
+  :is(.portfolioHeader, .portfolioEntryDetail) a {
+    color: var(--accent);
+    text-decoration: none;
+  }
 }
